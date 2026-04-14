@@ -47,7 +47,6 @@ export function PoolCalendar({
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = addMonths(today, 3);
 
-  // ----- Fetch weather data -----
   useEffect(() => {
     async function loadWeather() {
       setLoadingWeather(true);
@@ -58,7 +57,6 @@ export function PoolCalendar({
     loadWeather();
   }, []);
 
-  // ----- Fetch initial bookings -----
   useEffect(() => {
     async function loadBookings() {
       const supabase = createClient();
@@ -86,7 +84,6 @@ export function PoolCalendar({
     loadBookings();
   }, [poolId]);
 
-  // ----- Supabase Realtime subscription -----
   useEffect(() => {
     const supabase = createClient();
 
@@ -133,7 +130,6 @@ export function PoolCalendar({
     };
   }, [poolId]);
 
-  // ----- Date click handler (selection only — NO checkout) -----
   const handleDateClick = useCallback(
     (date: Date) => {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -159,7 +155,6 @@ export function PoolCalendar({
     [bookingStatuses, pricing, onDateSelect]
   );
 
-  // ----- Disabled days -----
   const disabledDays = useCallback(
     (date: Date) => {
       if (isBefore(date, today)) return true;
@@ -170,7 +165,6 @@ export function PoolCalendar({
     [today, bookingStatuses]
   );
 
-  // ----- Day modifiers -----
   const modifiers = useMemo(() => {
     const negotiating: Date[] = [];
     const confirmed: Date[] = [];
@@ -184,7 +178,6 @@ export function PoolCalendar({
     return { negotiating, confirmed };
   }, [bookingStatuses]);
 
-  // ----- Split calculator -----
   const splitValue = useMemo(() => {
     const count = parseInt(splitCount);
     if (!currentPrice || !count || count < 2) return null;
@@ -192,44 +185,42 @@ export function PoolCalendar({
   }, [currentPrice, splitCount]);
 
   return (
-    <section id="calendar" className="scroll-mt-20 space-y-4">
-      {/* Calendar Card */}
-      <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
-        {/* Section header */}
-        <div className="px-4 sm:px-5 pt-4 pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 shadow-sm">
-                <svg
-                  className="h-4 w-4 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="font-bold text-slate-800 text-[15px]">
-                  Escolha sua data
-                </h2>
-                <p className="text-[11px] text-slate-400 mt-px">
-                  Toque em um dia disponível
-                </p>
-              </div>
+    <section id="calendar" className="scroll-mt-20 space-y-3">
+      {/* ===== CALENDAR CARD ===== */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-400">
+              <svg
+                className="h-4 w-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </div>
-            {loadingWeather && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50">
-                <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
-                <span className="text-[10px] text-slate-400">Clima...</span>
-              </div>
-            )}
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">
+                Escolha sua data
+              </h2>
+              <p className="text-[10px] text-slate-400">
+                Toque em um dia disponível
+              </p>
+            </div>
           </div>
+          {loadingWeather && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50">
+              <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+              <span className="text-[9px] text-slate-400">Clima...</span>
+            </div>
+          )}
         </div>
 
-        {/* Calendar body */}
-        <div className="px-2 sm:px-4 pb-3">
+        {/* DayPicker — the nav is relative-positioned inside the month container */}
+        <div className="px-2 sm:px-3 pb-3 pool-calendar-wrapper">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -247,35 +238,35 @@ export function PoolCalendar({
             classNames={{
               root: "w-full",
               months: "flex flex-col",
-              month: "space-y-1",
+              month: "relative",
               month_caption:
-                "flex items-center justify-between px-2 py-2 mb-1",
+                "flex items-center justify-center h-11 relative z-10",
               caption_label:
-                "text-base font-extrabold text-slate-800 capitalize",
-              nav: "flex items-center gap-1",
+                "text-sm font-bold text-slate-700 capitalize",
+              nav: "absolute top-0 left-0 right-0 h-11 flex items-center justify-between px-1 z-20 pointer-events-none",
               button_previous:
-                "inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-sky-50 text-slate-600 hover:text-sky-600 transition-all active:scale-90 border border-slate-200 hover:border-sky-200",
+                "pointer-events-auto inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-100 hover:bg-sky-100 text-slate-500 hover:text-sky-600 transition-all active:scale-90 border border-slate-200",
               button_next:
-                "inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-sky-50 text-slate-600 hover:text-sky-600 transition-all active:scale-90 border border-slate-200 hover:border-sky-200",
-              weekdays: "flex",
+                "pointer-events-auto inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-100 hover:bg-sky-100 text-slate-500 hover:text-sky-600 transition-all active:scale-90 border border-slate-200",
+              weekdays: "flex mt-1",
               weekday:
-                "flex-1 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wide py-2",
+                "flex-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wide py-1.5",
               week: "flex",
-              day: "flex-1 text-center p-[1.5px]",
+              day: "flex-1 text-center p-px",
               day_button:
-                "w-full aspect-square rounded-lg text-[13px] font-semibold transition-all duration-150 relative flex flex-col items-center justify-center gap-0 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400/30 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:shadow-md aria-selected:shadow-sky-400/30 aria-selected:ring-2 aria-selected:ring-sky-400/20 aria-selected:ring-offset-1",
+                "w-full aspect-square rounded-lg text-[13px] font-semibold transition-all duration-100 relative flex flex-col items-center justify-center hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300/40 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:shadow-md aria-selected:shadow-sky-400/30",
               disabled:
                 "opacity-25 cursor-not-allowed hover:bg-transparent",
-              today: "font-black text-sky-600 ring-1 ring-sky-200 rounded-lg",
+              today: "font-black text-sky-600 ring-1 ring-sky-200",
               selected: "",
-              outside: "text-slate-300",
+              outside: "text-slate-200",
             }}
             components={{
               Chevron: ({ orientation }) =>
                 orientation === "left" ? (
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 ) : (
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 ),
               DayButton: (props: DayButtonProps) => {
                 const dateStr = format(props.day.date, "yyyy-MM-dd");
@@ -286,15 +277,15 @@ export function PoolCalendar({
                 const isNegotiating = status === "negotiating";
                 const isWknd = isWeekend(props.day.date);
 
-                let bgClass = "";
+                let cellClass = "";
                 if (isNegotiating) {
-                  bgClass =
-                    "!bg-amber-50 !text-amber-800 border border-amber-200/80 cursor-not-allowed hover:!bg-amber-50";
+                  cellClass =
+                    "!bg-amber-50 !text-amber-700 border border-amber-200 cursor-not-allowed hover:!bg-amber-50";
                 } else if (status === "confirmed") {
-                  bgClass =
+                  cellClass =
                     "!bg-slate-50 !text-slate-300 line-through cursor-not-allowed hover:!bg-slate-50";
                 } else if (isWknd && !isPast) {
-                  bgClass = "bg-orange-50/60";
+                  cellClass = "bg-orange-50/50";
                 }
 
                 return (
@@ -315,14 +306,14 @@ export function PoolCalendar({
                       }
                       props.onClick?.(e);
                     }}
-                    className={`${props.className ?? ""} ${bgClass}`}
+                    className={`${props.className ?? ""} ${cellClass}`}
                   >
                     <span className="text-[13px] leading-none">
                       {props.day.date.getDate()}
                     </span>
 
                     {weather && !isPast && (
-                      <span className="text-[8px] leading-none opacity-50 mt-0.5">
+                      <span className="text-[7px] leading-none opacity-50 mt-0.5">
                         {getWeatherIcon(weather.weatherCode)}{" "}
                         {weather.temperatureMax}°
                       </span>
@@ -330,7 +321,7 @@ export function PoolCalendar({
 
                     {isNegotiating && (
                       <span
-                        className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse ring-2 ring-white"
+                        className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse ring-1 ring-white"
                         title="Em negociação"
                       />
                     )}
@@ -342,79 +333,71 @@ export function PoolCalendar({
         </div>
 
         {/* Legend */}
-        <div className="px-4 sm:px-5 pb-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 py-2.5 px-3 rounded-xl bg-slate-50/80 border border-slate-100">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-              <span className="text-[10px] text-slate-500 font-medium">
-                Disponível
-              </span>
+        <div className="px-3 pb-3">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-2 rounded-lg bg-slate-50 border border-slate-100 text-[10px]">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-sky-400" />
+              <span className="text-slate-500">Disponível</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-              <span className="text-[10px] text-slate-500 font-medium">
-                Negociando
-              </span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className="text-slate-500">Negociando</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-              <span className="text-[10px] text-slate-500 font-medium">
-                Reservado
-              </span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-slate-300" />
+              <span className="text-slate-500">Reservado</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-orange-200" />
-              <span className="text-[10px] text-slate-500 font-medium">
-                Fim de semana
-              </span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-orange-200" />
+              <span className="text-slate-500">Fim de semana</span>
             </div>
             {!loadingWeather && (
-              <div className="flex items-center gap-1">
-                <span className="text-[10px]">☀️</span>
-                <span className="text-[10px] text-slate-400">14 dias</span>
+              <div className="flex items-center gap-0.5">
+                <span>☀️</span>
+                <span className="text-slate-400">14d</span>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ===== Selected Date Summary + Split Calculator ===== */}
+      {/* ===== SELECTED DATE SUMMARY ===== */}
       {selectedDate && currentPrice !== null && (
-        <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-          <div className="p-4 sm:p-5">
-            {/* Date + Price */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden animate-in fade-in-50 slide-in-from-bottom-2 duration-200">
+          <div className="p-4">
+            {/* Date + Price — stacks on tiny screens, row on sm+ */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
                   Data selecionada
                 </p>
-                <p className="text-[15px] font-bold text-slate-800 capitalize mt-0.5 leading-snug">
+                <p className="text-[14px] font-bold text-slate-800 capitalize mt-0.5 leading-snug">
                   {format(selectedDate, "EEE, d 'de' MMMM", { locale: ptBR })}
                 </p>
                 {isWeekend(selectedDate) && (
-                  <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-orange-50 text-orange-600 border border-orange-100">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                  <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-px rounded text-[9px] font-semibold bg-orange-50 text-orange-600 border border-orange-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-300" />
                     Fim de semana
                   </span>
                 )}
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
                   Preço
                 </p>
-                <p className="text-2xl font-black text-sky-600 mt-0.5 leading-none">
+                <p className="text-xl font-black text-sky-600 mt-0.5 leading-none">
                   R$ {currentPrice}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">/dia</p>
+                <p className="text-[9px] text-slate-400 mt-0.5">/dia</p>
               </div>
             </div>
 
             {/* Split Calculator */}
-            <div className="mt-4 pt-3.5 border-t border-dashed border-slate-200">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Users className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                  <span className="text-[13px] text-slate-600 font-medium">
+            <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Users className="h-3.5 w-3.5 text-purple-400 flex-shrink-0" />
+                  <span className="text-[12px] text-slate-500 font-medium">
                     Dividir por quantos?
                   </span>
                 </div>
@@ -426,16 +409,16 @@ export function PoolCalendar({
                   value={splitCount}
                   onChange={(e) => setSplitCount(e.target.value)}
                   placeholder="—"
-                  className="w-16 h-9 text-center text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-300 focus:ring-2 focus:ring-purple-50 outline-none transition-all placeholder:text-slate-300"
+                  className="w-14 h-8 text-center text-sm font-bold bg-slate-50 border border-slate-200 rounded-lg focus:border-purple-300 focus:ring-1 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-300"
                 />
               </div>
 
               {splitValue && (
-                <div className="mt-3 py-2.5 rounded-xl bg-purple-50/80 border border-purple-100 text-center animate-in fade-in-50 duration-200">
-                  <span className="text-lg font-black text-purple-600">
+                <div className="mt-2 py-2 rounded-lg bg-purple-50 border border-purple-100 text-center animate-in fade-in-50 duration-150">
+                  <span className="text-base font-black text-purple-600">
                     R$ {splitValue}
                   </span>
-                  <span className="text-xs text-purple-400 ml-1">
+                  <span className="text-[11px] text-purple-400 ml-1">
                     por pessoa
                   </span>
                 </div>
