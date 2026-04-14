@@ -34,6 +34,81 @@ export async function getOwnerPool(): Promise<Pool | null> {
   return data as Pool | null;
 }
 
+export interface OwnerStats {
+  totalBookings: number;
+  confirmedBookings: number;
+  totalRevenue: number;
+  upcomingBookings: {
+    guest_name: string;
+    booking_date: string;
+    total_price: number;
+    status: string;
+  }[];
+  subscription: {
+    status: string;
+    expires_at: string | null;
+  } | null;
+}
+
+export async function getOwnerStats(poolId: string): Promise<OwnerStats> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      totalBookings: 0,
+      confirmedBookings: 0,
+      totalRevenue: 0,
+      upcomingBookings: [],
+      subscription: null,
+    };
+  }
+
+  // All bookings for this pool
+  const { data: allBookings } = await supabase
+    .from("bookings")
+    .select("status, total_price, booking_date, guest_name")
+    .eq("pool_id", poolId);
+
+  const bookings = allBookings || [];
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  const totalRevenue = confirmed.reduce(
+    (sum, b) => sum + (Number(b.total_price) || 0),
+    0
+  );
+
+  // Upcoming bookings (today or future, confirmed)
+  const today = new Date().toISOString().split("T")[0];
+  const upcoming = confirmed
+    .filter((b) => b.booking_date >= today)
+    .sort((a, b) => a.booking_date.localeCompare(b.booking_date))
+    .slice(0, 5)
+    .map((b) => ({
+      guest_name: b.guest_name,
+      booking_date: b.booking_date,
+      total_price: Number(b.total_price) || 0,
+      status: b.status,
+    }));
+
+  // Subscription
+  const { data: sub } = await supabase
+    .from("host_subscriptions")
+    .select("status, expires_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return {
+    totalBookings: bookings.length,
+    confirmedBookings: confirmed.length,
+    totalRevenue,
+    upcomingBookings: upcoming,
+    subscription: sub || null,
+  };
+}
+
 export type PoolFormData = {
   title: string;
   neighborhood: string;
