@@ -8,7 +8,7 @@ import type { Pool } from "@/lib/types";
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/admin/login");
+  redirect("/host/login");
 }
 
 export async function getOwnerPool(): Promise<Pool | null> {
@@ -107,7 +107,7 @@ export async function upsertPool(
     poolId = data.id;
   }
 
-  revalidatePath("/admin");
+  revalidatePath("/host/dashboard");
   revalidatePath("/");
   return { poolId: poolId! };
 }
@@ -123,7 +123,6 @@ export async function deletePoolPhoto(photoUrl: string): Promise<{ error?: strin
     return { error: "Não autenticado." };
   }
 
-  // Extract path from URL: .../storage/v1/object/public/pool-photos/owner_id/filename.webp
   try {
     const url = new URL(photoUrl);
     const pathParts = url.pathname.split("/storage/v1/object/public/pool-photos/");
@@ -131,7 +130,7 @@ export async function deletePoolPhoto(photoUrl: string): Promise<{ error?: strin
       return { error: "URL da foto inválida." };
     }
 
-    const filePath = pathParts[1]; // owner_id/filename.webp
+    const filePath = pathParts[1];
 
     const { error } = await supabase.storage
       .from("pool-photos")

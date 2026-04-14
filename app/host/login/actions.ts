@@ -23,10 +23,10 @@ export async function signIn(formData: FormData) {
       return { error: "E-mail ou senha incorretos." };
     }
     if (error.message.includes("Email not confirmed")) {
-      return { error: "Confirme seu e-mail antes de fazer login." };
+      return { error: "Confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada." };
     }
     return { error: `Erro ao fazer login: ${error.message}` };
   }
 
-  redirect("/admin");
+  redirect("/host/dashboard");
 }

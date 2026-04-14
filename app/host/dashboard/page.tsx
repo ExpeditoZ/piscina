@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getOwnerPool, signOut } from "./actions";
 import { PoolForm } from "./pool-form";
 
-export default async function AdminDashboard() {
+export default async function HostDashboard() {
   const pool = await getOwnerPool();
 
   return (
@@ -48,7 +48,9 @@ export default async function AdminDashboard() {
                   Cadastre sua piscina
                 </h2>
                 <p className="text-slate-500 max-w-md mx-auto">
-                  Preencha as informações abaixo para criar seu anúncio. Você só precisa fazer isso uma vez — depois, gerencie tudo pelo Telegram!
+                  Preencha as informações abaixo para criar seu anúncio.
+                  Você só precisa fazer isso uma vez — depois, gerencie
+                  tudo pelo Telegram!
                 </p>
               </CardContent>
             </Card>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Waves, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
+import { Waves, LogIn, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { toast } from "sonner";
 import { signIn } from "./actions";
 
-export default function AdminLoginPage() {
+export default function HostLoginPage() {
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -24,12 +25,21 @@ export default function AdminLoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-cyan-50 to-blue-50 px-4">
-      {/* Animated background bubbles */}
+      {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-4 -left-4 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl animate-pulse" />
         <div className="absolute top-1/2 -right-20 w-96 h-96 bg-cyan-200/20 rounded-full blur-3xl animate-pulse [animation-delay:1s]" />
         <div className="absolute -bottom-10 left-1/3 w-80 h-80 bg-blue-200/25 rounded-full blur-3xl animate-pulse [animation-delay:2s]" />
       </div>
+
+      {/* Back to home */}
+      <Link
+        href="/"
+        className="fixed top-4 left-4 z-20 flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Voltar
+      </Link>
 
       <Card className="w-full max-w-md relative z-10 border-0 shadow-xl shadow-sky-200/40 bg-white/80 backdrop-blur-xl">
         <CardHeader className="text-center pb-2 pt-8">
@@ -42,9 +52,8 @@ export default function AdminLoginPage() {
               AlugueSuaPiscina
             </h1>
           </div>
-          {/* Subtitle */}
           <p className="text-sm text-slate-500 mt-1">
-            Painel do Proprietário
+            Painel do Anunciante
           </p>
         </CardHeader>
 
@@ -68,9 +77,17 @@ export default function AdminLoginPage() {
 
             {/* Password */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 font-medium text-sm">
-                Senha
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-slate-700 font-medium text-sm">
+                  Senha
+                </Label>
+                <Link
+                  href="/host/forgot-password"
+                  className="text-xs text-sky-500 hover:text-sky-600 transition-colors"
+                >
+                  Esqueceu a senha?
+                </Link>
+              </div>
               <div className="relative">
                 <Input
                   id="password"
@@ -106,16 +123,24 @@ export default function AdminLoginPage() {
               ) : (
                 <>
                   <LogIn className="h-4 w-4 mr-2" />
-                  Entrar no Painel
+                  Entrar
                 </>
               )}
             </Button>
           </form>
 
-          {/* Footer hint */}
-          <p className="text-xs text-center text-slate-400 mt-6">
-            Acesso exclusivo para proprietários de piscinas cadastrados.
-          </p>
+          {/* Signup link */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-500">
+              Ainda não tem conta?{" "}
+              <Link
+                href="/host/signup"
+                className="text-sky-500 hover:text-sky-600 font-semibold transition-colors"
+              >
+                Criar conta grátis
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </main>

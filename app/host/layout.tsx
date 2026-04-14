@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Painel do Proprietário | AlugueSuaPiscina",
-  description: "Gerencie sua piscina e reservas.",
+  title: "Área do Anunciante | AlugueSuaPiscina",
+  description: "Gerencie sua piscina, reservas e assinatura.",
 };
 
-export default function AdminLayout({
+export default function HostLayout({
   children,
 }: {
   children: React.ReactNode;

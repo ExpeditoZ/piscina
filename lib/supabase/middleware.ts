@@ -34,14 +34,45 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect /admin routes (except /admin/login)
+  // Protect /host/dashboard routes — redirect to login if not authenticated
   if (
     !user &&
-    request.nextUrl.pathname.startsWith("/admin") &&
-    !request.nextUrl.pathname.startsWith("/admin/login")
+    request.nextUrl.pathname.startsWith("/host/dashboard")
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = "/admin/login";
+    url.pathname = "/host/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Protect /host/reset-password — requires active session from auth callback
+  if (
+    !user &&
+    request.nextUrl.pathname.startsWith("/host/reset-password")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/host/forgot-password";
+    return NextResponse.redirect(url);
+  }
+
+  // If authenticated user visits /host/login or /host/signup, redirect to dashboard
+  if (
+    user &&
+    (request.nextUrl.pathname === "/host/login" ||
+      request.nextUrl.pathname === "/host/signup")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/host/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  // Legacy /admin redirect → /host/dashboard
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    const url = request.nextUrl.clone();
+    if (request.nextUrl.pathname === "/admin/login") {
+      url.pathname = "/host/login";
+    } else {
+      url.pathname = "/host/dashboard";
+    }
     return NextResponse.redirect(url);
   }
 

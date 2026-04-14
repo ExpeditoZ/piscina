@@ -39,7 +39,7 @@ export default async function Home() {
 
             {/* Host Login CTA — always visible */}
             <Link
-              href="/admin/login"
+              href="/host/login"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors"
             >
               <LogIn className="h-3.5 w-3.5" />
@@ -83,7 +83,7 @@ export default async function Home() {
               Ver piscinas disponíveis
             </a>
             <Link
-              href="/admin/login"
+              href="/host/login"
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/15 backdrop-blur-sm text-white font-medium text-sm border border-white/30 hover:bg-white/25 transition-all duration-200"
             >
               <PlusCircle className="h-4 w-4" />
@@ -115,7 +115,7 @@ export default async function Home() {
 
             {/* Host CTA in empty state */}
             <Link
-              href="/admin/login"
+              href="/host/login"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-sky-500 text-white font-semibold text-sm shadow-md hover:bg-sky-600 transition-colors"
             >
               <PlusCircle className="h-4 w-4" />
@@ -152,7 +152,7 @@ export default async function Home() {
           </div>
           <div className="flex items-center gap-4">
             <Link
-              href="/admin/login"
+              href="/host/login"
               className="text-xs text-slate-400 hover:text-sky-500 transition-colors"
             >
               Área do Anunciante
