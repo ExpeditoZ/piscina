@@ -63,6 +63,13 @@ export async function upsertPool(
     return { error: "Não autenticado." };
   }
 
+  // Check if listing meets minimum requirements for publication
+  const isComplete =
+    !!formData.title.trim() &&
+    !!formData.neighborhood.trim() &&
+    !!formData.owner_whatsapp.trim() &&
+    formData.photos.length > 0;
+
   const poolData = {
     owner_id: user.id,
     title: formData.title,
@@ -80,10 +87,23 @@ export async function upsertPool(
   };
 
   if (poolId) {
-    // Update existing pool
+    // Fetch current status to determine if we should auto-transition
+    const { data: currentPool } = await supabase
+      .from("pools")
+      .select("status")
+      .eq("id", poolId)
+      .eq("owner_id", user.id)
+      .single();
+
+    // Auto-transition: draft → pending_subscription when requirements met
+    const updateData: Record<string, unknown> = { ...poolData };
+    if (currentPool?.status === "draft" && isComplete) {
+      updateData.status = "pending_subscription";
+    }
+
     const { error } = await supabase
       .from("pools")
-      .update(poolData)
+      .update(updateData)
       .eq("id", poolId)
       .eq("owner_id", user.id);
 
@@ -92,10 +112,15 @@ export async function upsertPool(
       return { error: `Erro ao atualizar piscina: ${error.message}` };
     }
   } else {
-    // Insert new pool
+    // Insert new pool with appropriate status
+    const insertData = {
+      ...poolData,
+      status: isComplete ? "pending_subscription" : "draft",
+    };
+
     const { data, error } = await supabase
       .from("pools")
-      .insert(poolData)
+      .insert(insertData)
       .select("id")
       .single();
 

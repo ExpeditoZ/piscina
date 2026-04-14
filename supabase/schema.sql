@@ -17,6 +17,12 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$ BEGIN
+  CREATE TYPE pool_status AS ENUM ('draft', 'pending_subscription', 'active', 'suspended');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
 -- ============================================================
 -- 3. TABLE: pools
 -- ============================================================
@@ -50,6 +56,9 @@ CREATE TABLE IF NOT EXISTS pools (
 
   -- Telegram integration
   telegram_chat_id TEXT DEFAULT NULL,
+
+  -- Listing status lifecycle: draft → pending_subscription → active → suspended
+  status           pool_status NOT NULL DEFAULT 'draft',
 
   -- Timestamps
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -309,7 +318,8 @@ SELECT
   rules,
   upsell_extras,
   created_at
-FROM pools;
+FROM pools
+WHERE status = 'active';
 
 -- Grant read access to the view
 GRANT SELECT ON public_pools TO anon, authenticated;

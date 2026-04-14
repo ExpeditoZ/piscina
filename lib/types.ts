@@ -23,6 +23,8 @@ export interface UpsellExtra {
   price: number;
 }
 
+export type PoolStatus = "draft" | "pending_subscription" | "active" | "suspended";
+
 export interface Pool {
   id: string;
   owner_id: string;
@@ -38,6 +40,7 @@ export interface Pool {
   rules: string | null;
   upsell_extras: UpsellExtra[] | null;
   telegram_chat_id: string | null;
+  status: PoolStatus;
   created_at: string;
   updated_at: string;
 }
