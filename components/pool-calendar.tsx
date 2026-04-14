@@ -185,7 +185,7 @@ export function PoolCalendar({
   }, [bookingStatuses]);
 
   return (
-    <Card className="border-0 shadow-lg shadow-sky-100/50 bg-white overflow-hidden">
+    <Card id="calendar" className="border-0 shadow-lg shadow-sky-100/50 bg-white overflow-hidden scroll-mt-20">
       <CardContent className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center gap-2 mb-4">

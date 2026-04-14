@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ArrowLeft,
   MapPin,
@@ -9,7 +9,11 @@ import {
   ScrollText,
   DollarSign,
   Waves,
+  Users,
+  Flame,
+  CalendarDays,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,10 +34,29 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
   const [selectedPrice, setSelectedPrice] = useState<number>(0);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
+  // FOMO: Simulated live viewer count (consistent per session)
+  const [viewerCount, setViewerCount] = useState(0);
+
+  useEffect(() => {
+    // Generate a believable viewer count (2-8) that changes every 30-60s
+    const base = 2 + Math.floor(Math.random() * 5);
+    setViewerCount(base);
+
+    const interval = setInterval(() => {
+      setViewerCount((prev) => {
+        const delta = Math.random() > 0.5 ? 1 : -1;
+        return Math.min(12, Math.max(2, prev + delta));
+      });
+    }, 30000 + Math.random() * 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const hasShifts =
     pool.shifts_config?.enabled && pool.shifts_config.options.length > 0;
   const hasExtras = pool.upsell_extras && pool.upsell_extras.length > 0;
   const hasRules = !!pool.rules;
+  const minPrice = Math.min(pool.pricing.weekday, pool.pricing.weekend);
 
   // Build current URL for sharing
   const poolUrl =
@@ -48,7 +71,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
+    <div className="min-h-screen bg-[#FAFAFA] pb-24">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -60,36 +83,55 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             <span className="hidden sm:inline">Voltar</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <Waves className="h-4 w-4 text-sky-500" />
             <span className="font-bold text-sm bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">
               AlugueSuaPiscina
             </span>
-          </div>
+          </Link>
 
-          <div className="w-16" /> {/* Spacer */}
+          <ShareButton poolTitle={pool.title} poolUrl={poolUrl} />
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
         {/* Image Carousel */}
         <ImageCarousel images={pool.photos} title={pool.title} />
 
-        {/* Title & Location */}
+        {/* Title, Location & FOMO */}
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
-            {pool.title}
-          </h1>
-          <div className="flex items-center gap-1.5 mt-2">
-            <MapPin className="h-4 w-4 text-sky-500" />
-            <p className="text-sm text-slate-500">
-              {pool.neighborhood}, {pool.city}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
+                {pool.title}
+              </h1>
+              <div className="flex items-center gap-1.5 mt-2">
+                <MapPin className="h-4 w-4 text-sky-500 flex-shrink-0" />
+                <p className="text-sm text-slate-500">
+                  {pool.neighborhood}, {pool.city}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* FOMO Badges */}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {viewerCount > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-100 animate-pulse">
+                <Flame className="h-3 w-3 text-red-500" />
+                <span className="text-xs font-semibold text-red-600">
+                  {viewerCount} {viewerCount === 1 ? "pessoa vendo" : "pessoas vendo"} agora
+                </span>
+              </div>
+            )}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+              <Users className="h-3 w-3 text-emerald-500" />
+              <span className="text-xs font-medium text-emerald-600">
+                Reserva instantânea
+              </span>
+            </div>
           </div>
         </div>
-
-        {/* Share Button */}
-        <ShareButton poolTitle={pool.title} poolUrl={poolUrl} />
 
         {/* Pricing Card */}
         <Card className="border-0 shadow-md shadow-sky-100/50 bg-gradient-to-br from-white to-sky-50/30 overflow-hidden">
@@ -204,6 +246,30 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
 
         <Separator />
       </main>
+
+      {/* Sticky Bottom CTA — prompts date selection when no date picked */}
+      {!checkoutOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-slate-400">A partir de</p>
+              <p className="text-lg font-bold text-slate-800">
+                R$ {minPrice}
+                <span className="text-sm font-normal text-slate-400">
+                  /dia
+                </span>
+              </p>
+            </div>
+            <a
+              href="#calendar"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white font-semibold text-sm shadow-lg shadow-sky-300/40 transition-all duration-200 hover:shadow-xl"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Escolher data
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Checkout Modal — no private data passed as props */}
       <CheckoutModal
