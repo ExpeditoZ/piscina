@@ -26,25 +26,24 @@ import {
 import type { Pricing, WeatherDay, BookingCalendar } from "@/lib/types";
 
 /* =============================================
-   Custom month caption with embedded navigation.
-   Uses max-w from parent CSS to stay grouped.
+   Custom MonthCaption with nav buttons
    ============================================= */
 function CustomMonthCaption({ calendarMonth }: MonthCaptionProps) {
   const { goToMonth, previousMonth, nextMonth } = useDayPicker();
 
   return (
-    <div className="flex items-center justify-between h-10 mb-2">
+    <div className="flex items-center justify-between px-1 h-12 mb-2">
       <button
         type="button"
         disabled={!previousMonth}
         onClick={() => previousMonth && goToMonth(previousMonth)}
-        className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-sky-50 hover:text-sky-600 active:scale-95 transition-colors disabled:opacity-25"
+        className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-sky-50 hover:text-sky-600 active:scale-95 transition-colors disabled:opacity-20"
         aria-label="Mês anterior"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-5 w-5" />
       </button>
 
-      <span className="text-[15px] font-bold text-slate-800 capitalize">
+      <span className="text-base font-extrabold text-slate-800 capitalize tracking-tight">
         {format(calendarMonth.date, "LLLL yyyy", { locale: ptBR })}
       </span>
 
@@ -52,10 +51,10 @@ function CustomMonthCaption({ calendarMonth }: MonthCaptionProps) {
         type="button"
         disabled={!nextMonth}
         onClick={() => nextMonth && goToMonth(nextMonth)}
-        className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-sky-50 hover:text-sky-600 active:scale-95 transition-colors disabled:opacity-25"
+        className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-sky-50 hover:text-sky-600 active:scale-95 transition-colors disabled:opacity-20"
         aria-label="Próximo mês"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-5 w-5" />
       </button>
     </div>
   );
@@ -72,11 +71,7 @@ interface PoolCalendarProps {
 
 type BookingStatusMap = Map<string, "negotiating" | "confirmed">;
 
-export function PoolCalendar({
-  poolId,
-  pricing,
-  onDateSelect,
-}: PoolCalendarProps) {
+export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [bookingStatuses, setBookingStatuses] = useState<BookingStatusMap>(new Map());
   const [weatherMap, setWeatherMap] = useState<Map<string, WeatherDay>>(new Map());
@@ -191,25 +186,24 @@ export function PoolCalendar({
   return (
     <section id="calendar" className="scroll-mt-16 space-y-3">
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        {/* Section header */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-1">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center flex-shrink-0">
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center flex-shrink-0">
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h2 className="font-bold text-slate-800 text-[14px]">Escolha sua data</h2>
+            <div>
+              <h2 className="font-bold text-slate-800 text-[15px]">Escolha sua data</h2>
+              <p className="text-[10px] text-slate-400 mt-px">Toque em um dia disponível</p>
+            </div>
           </div>
-          {loadingWeather && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />}
+          {loadingWeather && <Loader2 className="h-4 w-4 animate-spin text-slate-300" />}
         </div>
 
-        {/*
-          CENTERING STRATEGY:
-          One max-w container wraps the MonthCaption + DayPicker grid + legend.
-          This ensures ◀ Month ▶ stays tight with the day grid on all screens.
-        */}
-        <div className="max-w-[380px] mx-auto px-3 pb-2">
+        {/* Calendar — fills the card, no narrow max-w constraint */}
+        <div className="px-3 sm:px-4 pb-3">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -228,13 +222,13 @@ export function PoolCalendar({
               month_caption: "",
               caption_label: "hidden",
               weekdays: "flex border-b border-slate-100 mb-1",
-              weekday: "flex-1 text-center text-[10px] font-bold text-slate-400 uppercase py-2",
+              weekday: "flex-1 text-center text-[11px] font-bold text-slate-400 uppercase py-2",
               week: "flex",
-              day: "flex-1 text-center p-[1px]",
+              day: "flex-1 text-center p-[2px]",
               day_button:
-                "w-full aspect-square rounded-lg text-[13px] font-medium relative flex flex-col items-center justify-center transition-colors hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:font-bold",
-              disabled: "opacity-20 cursor-not-allowed hover:bg-transparent",
-              today: "font-bold text-sky-600",
+                "w-full aspect-square rounded-xl text-sm font-semibold relative flex flex-col items-center justify-center transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:font-bold aria-selected:shadow-md aria-selected:shadow-sky-300/40",
+              disabled: "cursor-not-allowed",
+              today: "font-extrabold",
               selected: "",
               outside: "text-slate-200",
             }}
@@ -249,18 +243,43 @@ export function PoolCalendar({
                 const isNegotiating = status === "negotiating";
                 const isConfirmed = status === "confirmed";
                 const isWknd = isWeekend(props.day.date);
+                const isToday = dateStr === format(today, "yyyy-MM-dd");
+                const isSelected = selectedDate && dateStr === format(selectedDate, "yyyy-MM-dd");
 
-                // Strong visual differentiation for booking states
-                let cls = "";
-                if (isConfirmed && !isPast) {
-                  // RESERVED — solid red-ish bg, crossed out, very obvious
-                  cls = "!bg-red-50 !text-red-300 line-through cursor-not-allowed hover:!bg-red-50 border border-red-100";
+                /*
+                  VISUAL STATE SYSTEM — every cell gets a clear bg + text treatment:
+                  1. Past         → faded, no interaction
+                  2. Confirmed    → red bg, line-through, red dot
+                  3. Negotiating  → amber bg, bold, pulsing dot
+                  4. Selected     → handled by aria-selected (sky-500)
+                  5. Weekend      → warm orange tint
+                  6. Available    → green tint to positively show availability
+                  7. Today        → sky ring
+                */
+                let cellClass = "";
+                let dotColor = "";
+
+                if (isPast) {
+                  cellClass = "bg-slate-50 text-slate-300 hover:bg-slate-50";
+                } else if (isConfirmed) {
+                  cellClass = "bg-red-50 text-red-300 line-through hover:bg-red-50 border border-red-200";
+                  dotColor = "bg-red-400";
                 } else if (isNegotiating) {
-                  // NEGOTIATING — solid amber bg, pulsing dot
-                  cls = "!bg-amber-100 !text-amber-800 font-bold cursor-not-allowed hover:!bg-amber-100 border border-amber-300";
-                } else if (isWknd && !isPast) {
-                  // WEEKEND — subtle warm tint
-                  cls = "bg-orange-50/50";
+                  cellClass = "bg-amber-50 text-amber-700 font-bold hover:bg-amber-50 border border-amber-300";
+                  dotColor = "bg-amber-500";
+                } else if (isSelected) {
+                  // aria-selected handles this
+                  cellClass = "";
+                } else if (isWknd) {
+                  cellClass = "bg-orange-50 text-slate-700 hover:bg-orange-100";
+                } else {
+                  // Available weekday — positive green tint
+                  cellClass = "bg-emerald-50/60 text-slate-700 hover:bg-emerald-100";
+                }
+
+                // Today ring (unless selected)
+                if (isToday && !isSelected) {
+                  cellClass += " ring-2 ring-sky-400 ring-inset";
                 }
 
                 return (
@@ -277,50 +296,51 @@ export function PoolCalendar({
                       }
                       props.onClick?.(e);
                     }}
-                    className={`${props.className ?? ""} ${cls}`}
+                    className={`${props.className ?? ""} ${cellClass}`}
                   >
-                    <span className="text-[13px] leading-none">{props.day.date.getDate()}</span>
-                    {weather && !isPast && (
+                    <span className="leading-none">{props.day.date.getDate()}</span>
+
+                    {weather && !isPast && !isConfirmed && (
                       <span className="text-[7px] leading-none opacity-50 mt-0.5">
                         {getWeatherIcon(weather.weatherCode)} {weather.temperatureMax}°
                       </span>
                     )}
-                    {isNegotiating && (
-                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500 animate-pulse ring-1 ring-white" />
-                    )}
-                    {isConfirmed && !isPast && (
-                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-400 ring-1 ring-white" />
+
+                    {dotColor && (
+                      <span className={`absolute top-1 right-1 w-2 h-2 rounded-full ${dotColor} ${isNegotiating ? "animate-pulse" : ""} ring-1 ring-white`} />
                     )}
                   </button>
                 );
               },
             }}
           />
+        </div>
 
-          {/* Legend — inside same max-w container so it aligns with grid */}
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 py-2 rounded-lg bg-slate-50 text-[10px]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-md bg-white border border-slate-200 flex items-center justify-center text-[9px] text-slate-500">15</span>
+        {/* Legend — uses mini cell mockups */}
+        <div className="px-3 sm:px-4 pb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-50/60">
+              <span className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[10px] text-slate-600 font-semibold">12</span>
               <span className="text-slate-600 font-medium">Disponível</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-md bg-amber-100 border border-amber-300 flex items-center justify-center text-[9px] text-amber-800 font-bold relative">
+            </div>
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-50">
+              <span className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-300 flex items-center justify-center text-[10px] text-amber-800 font-bold relative">
                 8
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
               </span>
               <span className="text-slate-600 font-medium">Negociando</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-md bg-red-50 border border-red-100 flex items-center justify-center text-[9px] text-red-300 line-through relative">
+            </div>
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50">
+              <span className="w-6 h-6 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-[10px] text-red-300 line-through font-semibold relative">
                 3
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-400" />
               </span>
               <span className="text-slate-600 font-medium">Reservado</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-md bg-orange-50 border border-orange-100 flex items-center justify-center text-[9px] text-slate-500">S</span>
+            </div>
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-orange-50">
+              <span className="w-6 h-6 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-[10px] text-slate-600 font-semibold">S</span>
               <span className="text-slate-600 font-medium">Fim de semana</span>
-            </span>
+            </div>
           </div>
         </div>
 
@@ -329,20 +349,16 @@ export function PoolCalendar({
           <div className="border-t border-slate-100 px-4 py-3 bg-sky-50/40 animate-in fade-in-50 duration-200">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
-                  Data selecionada
-                </p>
-                <p className="text-[13px] font-bold text-slate-800 capitalize mt-0.5">
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Data selecionada</p>
+                <p className="text-[14px] font-bold text-slate-800 capitalize mt-0.5">
                   {format(selectedDate, "EEE, d 'de' MMMM", { locale: ptBR })}
                   {isWeekend(selectedDate) && (
-                    <span className="ml-1 text-[9px] font-semibold text-orange-600 bg-orange-100 px-1 py-px rounded">
-                      FDS
-                    </span>
+                    <span className="ml-1 text-[9px] font-semibold text-orange-600 bg-orange-100 px-1 py-px rounded">FDS</span>
                   )}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-xl font-black text-sky-600">R$ {currentPrice}</p>
+                <p className="text-2xl font-black text-sky-600">R$ {currentPrice}</p>
                 <p className="text-[9px] text-slate-400">/dia</p>
               </div>
             </div>
@@ -350,10 +366,8 @@ export function PoolCalendar({
             <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-purple-400 flex-shrink-0" />
-                  <span className="text-[12px] text-slate-500 font-medium">
-                    Dividir por quantos?
-                  </span>
+                  <Users className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                  <span className="text-[13px] text-slate-500 font-medium">Dividir por quantos?</span>
                 </div>
                 <input
                   type="number"
@@ -363,12 +377,12 @@ export function PoolCalendar({
                   value={splitCount}
                   onChange={(e) => setSplitCount(e.target.value)}
                   placeholder="—"
-                  className="w-14 h-8 text-center text-sm font-bold bg-white border border-slate-200 rounded-lg focus:border-purple-300 focus:ring-1 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-300"
+                  className="w-16 h-9 text-center text-sm font-bold bg-white border border-slate-200 rounded-lg focus:border-purple-300 focus:ring-1 focus:ring-purple-100 outline-none transition-all placeholder:text-slate-300"
                 />
               </div>
               {splitValue && (
-                <div className="mt-2 py-2 rounded-lg bg-purple-50 text-center animate-in fade-in-50 duration-150">
-                  <span className="text-base font-black text-purple-600">R$ {splitValue}</span>
+                <div className="mt-2.5 py-2.5 rounded-lg bg-purple-50 text-center animate-in fade-in-50 duration-150">
+                  <span className="text-lg font-black text-purple-600">R$ {splitValue}</span>
                   <span className="text-[11px] text-purple-400 ml-1">por pessoa</span>
                 </div>
               )}
