@@ -36,7 +36,6 @@ import type {
 
 interface CheckoutModalProps {
   pool: PoolPublic;
-  ownerWhatsapp: string | null;
   selectedDate: Date | null;
   basePrice: number;
   open: boolean;
@@ -45,7 +44,6 @@ interface CheckoutModalProps {
 
 export function CheckoutModal({
   pool,
-  ownerWhatsapp,
   selectedDate,
   basePrice,
   open,
@@ -125,7 +123,7 @@ export function CheckoutModal({
     return true;
   }, [guestName, arrivalTime, hasRules, rulesAccepted]);
 
-  // ----- Submit: Insert booking + Notify owner + Redirect WhatsApp -----
+  // ----- Submit: Insert booking + Get WhatsApp URL from API -----
   async function handleSubmit() {
     if (!canSubmit || !selectedDate || isSubmitting) return;
 
@@ -149,38 +147,36 @@ export function CheckoutModal({
 
       // 3. Insert booking with status='negotiating'
       const supabase = createClient();
-      const { error: insertError } = await supabase.from("bookings").insert({
-        pool_id: pool.id,
-        guest_name: guestName.trim(),
-        arrival_time: arrivalTime,
-        booking_date: dateStr,
-        shift_selected: selectedShift?.name ?? null,
-        total_price: totalPrice,
-        selected_upsells: upsellsForDB,
-        status: "negotiating",
-      });
+      const { data: insertedBooking, error: insertError } = await supabase
+        .from("bookings")
+        .insert({
+          pool_id: pool.id,
+          guest_name: guestName.trim(),
+          arrival_time: arrivalTime,
+          booking_date: dateStr,
+          shift_selected: selectedShift?.name ?? null,
+          total_price: totalPrice,
+          selected_upsells: upsellsForDB,
+          status: "negotiating",
+        })
+        .select("id")
+        .single();
 
       if (insertError) {
-        console.error("Booking insert error:", insertError);
-        toast.error("Erro ao registrar reserva. Tente novamente.");
+        // Handle double-booking conflict
+        if (insertError.code === "23505") {
+          toast.error(
+            "Esta data já está reservada ou em negociação. Escolha outra data."
+          );
+        } else {
+          console.error("Booking insert error:", insertError);
+          toast.error("Erro ao registrar reserva. Tente novamente.");
+        }
         setIsSubmitting(false);
         return;
       }
 
-      // 4. Silently notify owner via Telegram (fire & forget)
-      fetch("/api/notify-owner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          poolId: pool.id,
-          guestName: guestName.trim(),
-          bookingDate: formattedDate,
-          totalPrice,
-          shiftSelected: selectedShift?.name ?? null,
-        }),
-      }).catch(console.error);
-
-      // 5. Build WhatsApp message
+      // 4. Build WhatsApp message text (phone number stays server-side)
       const upsellNames = hasExtras
         ? pool
             .upsell_extras!.filter((e) => selectedUpsells.has(e.id))
@@ -206,17 +202,36 @@ export function CheckoutModal({
         .filter(Boolean)
         .join(". ");
 
-      const encodedMessage = encodeURIComponent(whatsappMessage);
-      const whatsappUrl = `https://wa.me/${ownerWhatsapp ?? ""}?text=${encodedMessage}`;
+      // 5. Call API to notify owner + get WhatsApp redirect URL
+      const notifyRes = await fetch("/api/notify-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poolId: pool.id,
+          bookingId: insertedBooking.id,
+          guestName: guestName.trim(),
+          bookingDate: formattedDate,
+          totalPrice,
+          shiftSelected: selectedShift?.name ?? null,
+          whatsappMessage,
+        }),
+      });
 
-      // 6. Show success toast + redirect
+      const notifyData = await notifyRes.json();
+
+      // 6. Show success toast + redirect to WhatsApp
       toast.success("Reserva registrada! Redirecionando para o WhatsApp...", {
         icon: <PartyPopper className="h-4 w-4" />,
       });
 
-      // Small delay for toast visibility
       setTimeout(() => {
-        window.open(whatsappUrl, "_blank");
+        if (notifyData.whatsappUrl) {
+          window.open(notifyData.whatsappUrl, "_blank");
+        } else {
+          toast.info(
+            "O proprietário foi notificado. Aguarde o contato via WhatsApp."
+          );
+        }
         onOpenChange(false);
         setIsSubmitting(false);
       }, 800);
@@ -229,9 +244,10 @@ export function CheckoutModal({
 
   if (!selectedDate) return null;
 
-  const savedName = typeof window !== "undefined"
-    ? localStorage.getItem("guestName")
-    : null;
+  const savedName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("guestName")
+      : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -386,7 +402,7 @@ export function CheckoutModal({
                   htmlFor="arrival-time"
                   className="text-xs text-slate-600"
                 >
-                  Horário de chegada (para pegar as chaves) *
+                  Horário de chegada *
                 </Label>
                 <Input
                   id="arrival-time"
@@ -488,7 +504,8 @@ export function CheckoutModal({
             disabled={!canSubmit || isSubmitting}
             className="w-full h-12 text-base font-bold rounded-xl shadow-lg transition-all duration-200 disabled:opacity-50"
             style={{
-              backgroundColor: canSubmit && !isSubmitting ? "#25D366" : undefined,
+              backgroundColor:
+                canSubmit && !isSubmitting ? "#25D366" : undefined,
               color: canSubmit && !isSubmitting ? "#fff" : undefined,
             }}
           >

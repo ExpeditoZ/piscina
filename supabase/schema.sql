@@ -99,6 +99,11 @@ CREATE INDEX IF NOT EXISTS idx_bookings_pool_date ON bookings(pool_id, booking_d
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON bookings(booking_date, status);
 
+-- UNIQUE constraint: prevent double-booking (only one active booking per pool per date)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_booking
+  ON bookings(pool_id, booking_date)
+  WHERE status IN ('negotiating', 'confirmed');
+
 
 -- ============================================================
 -- 5. ENABLE ROW LEVEL SECURITY (RLS)

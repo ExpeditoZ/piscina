@@ -22,10 +22,9 @@ import type { PoolPublic } from "@/lib/types";
 
 interface PoolDetailClientProps {
   pool: PoolPublic;
-  ownerWhatsapp: string | null;
 }
 
-export function PoolDetailClient({ pool, ownerWhatsapp }: PoolDetailClientProps) {
+export function PoolDetailClient({ pool }: PoolDetailClientProps) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number>(0);
@@ -206,10 +205,9 @@ export function PoolDetailClient({ pool, ownerWhatsapp }: PoolDetailClientProps)
         <Separator />
       </main>
 
-      {/* Checkout Modal */}
+      {/* Checkout Modal — no private data passed as props */}
       <CheckoutModal
         pool={pool}
-        ownerWhatsapp={ownerWhatsapp}
         selectedDate={selectedDate}
         basePrice={selectedPrice}
         open={checkoutOpen}

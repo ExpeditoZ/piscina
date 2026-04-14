@@ -46,7 +46,7 @@ export default async function PoolDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // Fetch public pool data
+  // Fetch ONLY public pool data — no private fields ever reach the client
   const { data: pool, error } = await supabase
     .from("public_pools")
     .select("*")
@@ -57,17 +57,5 @@ export default async function PoolDetailPage({
     notFound();
   }
 
-  // Fetch owner's WhatsApp separately (private field not in view)
-  const { data: privateData } = await supabase
-    .from("pools")
-    .select("owner_whatsapp")
-    .eq("id", id)
-    .maybeSingle();
-
-  return (
-    <PoolDetailClient
-      pool={pool as PoolPublic}
-      ownerWhatsapp={privateData?.owner_whatsapp ?? null}
-    />
-  );
+  return <PoolDetailClient pool={pool as PoolPublic} />;
 }

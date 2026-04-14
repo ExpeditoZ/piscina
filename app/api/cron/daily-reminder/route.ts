@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Daily Reminder Cron Job
  * Runs every day at 21:00 UTC (18:00 BRT) via Vercel Cron.
  *
- * Finds all confirmed bookings for TOMORROW and sends a
- * reminder to the pool owner via Telegram.
+ * 1. First, cleans up stale negotiations (backup for pg_cron)
+ * 2. Then, finds all confirmed bookings for TOMORROW and sends
+ *    a reminder to the pool owner via Telegram.
  */
 export async function GET(request: Request) {
   // Verify cron secret to prevent unauthorized access
@@ -20,15 +21,31 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
+    // ===== STEP 1: Cleanup stale negotiations (backup for pg_cron) =====
+    const twoHoursAgo = new Date();
+    twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
+
+    const { data: cleanedUp } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("status", "negotiating")
+      .lt("created_at", twoHoursAgo.toISOString())
+      .select("id");
+
+    const cleanedCount = cleanedUp?.length ?? 0;
+
+    // ===== STEP 2: Send reminders for tomorrow's bookings =====
     if (!botToken) {
-      return Response.json({ error: "TELEGRAM_BOT_TOKEN not set" }, { status: 500 });
+      return Response.json({
+        ok: true,
+        cleanedCount,
+        error: "TELEGRAM_BOT_TOKEN not set — skipping reminders",
+      });
     }
 
-    // Fetch confirmed bookings for tomorrow
-    // Using Supabase's SQL capabilities via RPC or direct query
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0]; // YYYY-MM-DD
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
     const { data: bookings, error } = await supabase
       .from("bookings")
@@ -46,7 +63,7 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error("Error fetching bookings:", error);
-      return Response.json({ error: "Query failed" }, { status: 500 });
+      return Response.json({ error: "Query failed", cleanedCount }, { status: 500 });
     }
 
     if (!bookings || bookings.length === 0) {
@@ -54,6 +71,7 @@ export async function GET(request: Request) {
         ok: true,
         message: "No bookings for tomorrow",
         date: tomorrowStr,
+        cleanedCount,
       });
     }
 
@@ -67,12 +85,10 @@ export async function GET(request: Request) {
 
     if (poolError) {
       console.error("Error fetching pools:", poolError);
-      return Response.json({ error: "Pool query failed" }, { status: 500 });
+      return Response.json({ error: "Pool query failed", cleanedCount }, { status: 500 });
     }
 
-    const poolMap = new Map(
-      pools?.map((p) => [p.id, p]) ?? []
-    );
+    const poolMap = new Map(pools?.map((p) => [p.id, p]) ?? []);
 
     // Send reminders
     let sentCount = 0;
@@ -91,7 +107,7 @@ export async function GET(request: Request) {
         `👤 Hóspede: *${booking.guest_name}*\n` +
         `🕐 Chegada: *${booking.arrival_time}*${shiftText}\n` +
         `💰 Valor: *R$ ${booking.total_price}*\n\n` +
-        `📋 Por favor, certifique-se de que a piscina está limpa e o cofre está pronto para a chegada do hóspede.`;
+        `📋 Certifique-se de que a piscina está limpa e pronta.`;
 
       try {
         await fetch(
@@ -120,6 +136,7 @@ export async function GET(request: Request) {
       date: tomorrowStr,
       bookingsFound: bookings.length,
       remindersSent: sentCount,
+      cleanedCount,
     });
   } catch (error) {
     console.error("Cron daily-reminder error:", error);
