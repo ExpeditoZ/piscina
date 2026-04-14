@@ -26,13 +26,14 @@ import {
 import type { Pricing, WeatherDay, BookingCalendar } from "@/lib/types";
 
 /* =============================================
-   Custom month caption with embedded navigation
+   Custom month caption with embedded navigation.
+   Uses max-w from parent CSS to stay grouped.
    ============================================= */
 function CustomMonthCaption({ calendarMonth }: MonthCaptionProps) {
   const { goToMonth, previousMonth, nextMonth } = useDayPicker();
 
   return (
-    <div className="flex items-center justify-between px-1 h-10 mb-1">
+    <div className="flex items-center justify-between h-10 mb-2">
       <button
         type="button"
         disabled={!previousMonth}
@@ -43,7 +44,7 @@ function CustomMonthCaption({ calendarMonth }: MonthCaptionProps) {
         <ChevronLeft className="h-4 w-4" />
       </button>
 
-      <span className="text-[14px] font-bold text-slate-800 capitalize">
+      <span className="text-[15px] font-bold text-slate-800 capitalize">
         {format(calendarMonth.date, "LLLL yyyy", { locale: ptBR })}
       </span>
 
@@ -77,12 +78,8 @@ export function PoolCalendar({
   onDateSelect,
 }: PoolCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [bookingStatuses, setBookingStatuses] = useState<BookingStatusMap>(
-    new Map()
-  );
-  const [weatherMap, setWeatherMap] = useState<Map<string, WeatherDay>>(
-    new Map()
-  );
+  const [bookingStatuses, setBookingStatuses] = useState<BookingStatusMap>(new Map());
+  const [weatherMap, setWeatherMap] = useState<Map<string, WeatherDay>>(new Map());
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [splitCount, setSplitCount] = useState("");
@@ -90,7 +87,6 @@ export function PoolCalendar({
   const today = useMemo(() => startOfDay(new Date()), []);
   const maxDate = addMonths(today, 3);
 
-  // Fetch weather
   useEffect(() => {
     (async () => {
       setLoadingWeather(true);
@@ -100,7 +96,6 @@ export function PoolCalendar({
     })();
   }, []);
 
-  // Fetch bookings
   useEffect(() => {
     (async () => {
       const supabase = createClient();
@@ -109,7 +104,6 @@ export function PoolCalendar({
         .select("booking_date, status")
         .eq("pool_id", poolId);
       if (error) return;
-
       const map: BookingStatusMap = new Map();
       (data as BookingCalendar[])?.forEach((b) => {
         if (b.status === "cancelled") return;
@@ -122,19 +116,13 @@ export function PoolCalendar({
     })();
   }, [poolId]);
 
-  // Realtime
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel(`bookings-${poolId}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "bookings",
-          filter: `pool_id=eq.${poolId}`,
-        },
+        { event: "*", schema: "public", table: "bookings", filter: `pool_id=eq.${poolId}` },
         (payload) => {
           const booking = payload.new as BookingCalendar & { pool_id: string };
           if (!booking?.booking_date) return;
@@ -153,7 +141,6 @@ export function PoolCalendar({
     return () => { supabase.removeChannel(channel); };
   }, [poolId]);
 
-  // Date click = select only
   const handleDateClick = useCallback(
     (date: Date) => {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -203,7 +190,6 @@ export function PoolCalendar({
 
   return (
     <section id="calendar" className="scroll-mt-16 space-y-3">
-      {/* Calendar card */}
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
@@ -213,113 +199,134 @@ export function PoolCalendar({
                 <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h2 className="font-bold text-slate-800 text-[14px]">
-              Escolha sua data
-            </h2>
+            <h2 className="font-bold text-slate-800 text-[14px]">Escolha sua data</h2>
           </div>
-          {loadingWeather && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />
-          )}
+          {loadingWeather && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />}
         </div>
 
-        {/* DayPicker */}
-        <div className="px-2 sm:px-3 pb-2 flex justify-center">
-          <div className="w-full max-w-[360px]">
-            <DayPicker
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && handleDateClick(date)}
-              locale={ptBR}
-              disabled={disabledDays}
-              fromDate={today}
-              toDate={maxDate}
-              showOutsideDays={false}
-              modifiers={modifiers}
-              classNames={{
-                root: "w-full",
-                months: "flex flex-col",
-                month: "",
-                nav: "hidden",
-                month_caption: "",
-                caption_label: "hidden",
-                weekdays: "flex",
-                weekday: "flex-1 text-center text-[10px] font-semibold text-slate-400 uppercase py-1",
-                week: "flex",
-                day: "flex-1 text-center p-[1px]",
-                day_button:
-                  "w-full aspect-square rounded-lg text-[13px] font-medium relative flex flex-col items-center justify-center transition-colors hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:font-bold",
-                disabled: "opacity-20 cursor-not-allowed hover:bg-transparent",
-                today: "font-bold text-sky-600",
-                selected: "",
-                outside: "text-slate-200",
-              }}
-              components={{
-                MonthCaption: CustomMonthCaption,
-                DayButton: (props: DayButtonProps) => {
-                  const dateStr = format(props.day.date, "yyyy-MM-dd");
-                  const weather = weatherMap.get(dateStr);
-                  const status = bookingStatuses.get(dateStr);
-                  const isPast = isBefore(props.day.date, today);
-                  const isDisabled = isPast || status === "confirmed";
-                  const isNegotiating = status === "negotiating";
-                  const isWknd = isWeekend(props.day.date);
+        {/*
+          CENTERING STRATEGY:
+          One max-w container wraps the MonthCaption + DayPicker grid + legend.
+          This ensures ◀ Month ▶ stays tight with the day grid on all screens.
+        */}
+        <div className="max-w-[380px] mx-auto px-3 pb-2">
+          <DayPicker
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => date && handleDateClick(date)}
+            locale={ptBR}
+            disabled={disabledDays}
+            fromDate={today}
+            toDate={maxDate}
+            showOutsideDays={false}
+            modifiers={modifiers}
+            classNames={{
+              root: "w-full",
+              months: "flex flex-col",
+              month: "",
+              nav: "hidden",
+              month_caption: "",
+              caption_label: "hidden",
+              weekdays: "flex border-b border-slate-100 mb-1",
+              weekday: "flex-1 text-center text-[10px] font-bold text-slate-400 uppercase py-2",
+              week: "flex",
+              day: "flex-1 text-center p-[1px]",
+              day_button:
+                "w-full aspect-square rounded-lg text-[13px] font-medium relative flex flex-col items-center justify-center transition-colors hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 aria-selected:bg-sky-500 aria-selected:text-white aria-selected:font-bold",
+              disabled: "opacity-20 cursor-not-allowed hover:bg-transparent",
+              today: "font-bold text-sky-600",
+              selected: "",
+              outside: "text-slate-200",
+            }}
+            components={{
+              MonthCaption: CustomMonthCaption,
+              DayButton: (props: DayButtonProps) => {
+                const dateStr = format(props.day.date, "yyyy-MM-dd");
+                const weather = weatherMap.get(dateStr);
+                const status = bookingStatuses.get(dateStr);
+                const isPast = isBefore(props.day.date, today);
+                const isDisabled = isPast || status === "confirmed";
+                const isNegotiating = status === "negotiating";
+                const isConfirmed = status === "confirmed";
+                const isWknd = isWeekend(props.day.date);
 
-                  let cls = "";
-                  if (isNegotiating) {
-                    cls = "!bg-amber-50 !text-amber-700 border border-amber-200 cursor-not-allowed hover:!bg-amber-50";
-                  } else if (status === "confirmed") {
-                    cls = "!bg-slate-50 !text-slate-300 line-through cursor-not-allowed hover:!bg-slate-50";
-                  } else if (isWknd && !isPast) {
-                    cls = "bg-orange-50/40";
-                  }
+                // Strong visual differentiation for booking states
+                let cls = "";
+                if (isConfirmed && !isPast) {
+                  // RESERVED — solid red-ish bg, crossed out, very obvious
+                  cls = "!bg-red-50 !text-red-300 line-through cursor-not-allowed hover:!bg-red-50 border border-red-100";
+                } else if (isNegotiating) {
+                  // NEGOTIATING — solid amber bg, pulsing dot
+                  cls = "!bg-amber-100 !text-amber-800 font-bold cursor-not-allowed hover:!bg-amber-100 border border-amber-300";
+                } else if (isWknd && !isPast) {
+                  // WEEKEND — subtle warm tint
+                  cls = "bg-orange-50/50";
+                }
 
-                  return (
-                    <button
-                      {...props}
-                      disabled={isDisabled}
-                      onClick={(e) => {
-                        if (isNegotiating) {
-                          e.preventDefault();
-                          toast.warning("Alguém está negociando esta data! 🔥", {
-                            description: "Aguarde ou escolha outra data disponível.",
-                          });
-                          return;
-                        }
-                        props.onClick?.(e);
-                      }}
-                      className={`${props.className ?? ""} ${cls}`}
-                    >
-                      <span className="text-[13px] leading-none">{props.day.date.getDate()}</span>
-                      {weather && !isPast && (
-                        <span className="text-[7px] leading-none opacity-50 mt-0.5">
-                          {getWeatherIcon(weather.weatherCode)} {weather.temperatureMax}°
-                        </span>
-                      )}
-                      {isNegotiating && (
-                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse ring-1 ring-white" />
-                      )}
-                    </button>
-                  );
-                },
-              }}
-            />
-          </div>
-        </div>
+                return (
+                  <button
+                    {...props}
+                    disabled={isDisabled}
+                    onClick={(e) => {
+                      if (isNegotiating) {
+                        e.preventDefault();
+                        toast.warning("Alguém está negociando esta data! 🔥", {
+                          description: "Aguarde ou escolha outra data disponível.",
+                        });
+                        return;
+                      }
+                      props.onClick?.(e);
+                    }}
+                    className={`${props.className ?? ""} ${cls}`}
+                  >
+                    <span className="text-[13px] leading-none">{props.day.date.getDate()}</span>
+                    {weather && !isPast && (
+                      <span className="text-[7px] leading-none opacity-50 mt-0.5">
+                        {getWeatherIcon(weather.weatherCode)} {weather.temperatureMax}°
+                      </span>
+                    )}
+                    {isNegotiating && (
+                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500 animate-pulse ring-1 ring-white" />
+                    )}
+                    {isConfirmed && !isPast && (
+                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-400 ring-1 ring-white" />
+                    )}
+                  </button>
+                );
+              },
+            }}
+          />
 
-        {/* Legend */}
-        <div className="px-3 pb-2">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1.5 px-2 rounded-lg bg-slate-50 text-[10px]">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /><span className="text-slate-500">Disponível</span></span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-slate-500">Negociando</span></span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /><span className="text-slate-500">Reservado</span></span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-200" /><span className="text-slate-500">Fim de semana</span></span>
+          {/* Legend — inside same max-w container so it aligns with grid */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 py-2 rounded-lg bg-slate-50 text-[10px]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-md bg-white border border-slate-200 flex items-center justify-center text-[9px] text-slate-500">15</span>
+              <span className="text-slate-600 font-medium">Disponível</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-md bg-amber-100 border border-amber-300 flex items-center justify-center text-[9px] text-amber-800 font-bold relative">
+                8
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
+              </span>
+              <span className="text-slate-600 font-medium">Negociando</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-md bg-red-50 border border-red-100 flex items-center justify-center text-[9px] text-red-300 line-through relative">
+                3
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-400" />
+              </span>
+              <span className="text-slate-600 font-medium">Reservado</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-md bg-orange-50 border border-orange-100 flex items-center justify-center text-[9px] text-slate-500">S</span>
+              <span className="text-slate-600 font-medium">Fim de semana</span>
+            </span>
           </div>
         </div>
 
         {/* Selected date + split calculator */}
         {selectedDate && currentPrice !== null && (
           <div className="border-t border-slate-100 px-4 py-3 bg-sky-50/40 animate-in fade-in-50 duration-200">
-            {/* Date + Price */}
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
@@ -335,14 +342,11 @@ export function PoolCalendar({
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-xl font-black text-sky-600">
-                  R$ {currentPrice}
-                </p>
+                <p className="text-xl font-black text-sky-600">R$ {currentPrice}</p>
                 <p className="text-[9px] text-slate-400">/dia</p>
               </div>
             </div>
 
-            {/* Split calculator */}
             <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
@@ -364,9 +368,7 @@ export function PoolCalendar({
               </div>
               {splitValue && (
                 <div className="mt-2 py-2 rounded-lg bg-purple-50 text-center animate-in fade-in-50 duration-150">
-                  <span className="text-base font-black text-purple-600">
-                    R$ {splitValue}
-                  </span>
+                  <span className="text-base font-black text-purple-600">R$ {splitValue}</span>
                   <span className="text-[11px] text-purple-400 ml-1">por pessoa</span>
                 </div>
               )}
