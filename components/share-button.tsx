@@ -1,7 +1,6 @@
 "use client";
 
 import { Share2, Copy, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -13,10 +12,9 @@ interface ShareButtonProps {
 export function ShareButton({ poolTitle, poolUrl }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Galera, achei essa piscina INCRÍVEL pro nosso fim de semana! Olha as fotos: ${poolUrl}. Bora rachar?? 🏊‍♂️🔥`;
+  const shareText = `Olha essa piscina: ${poolTitle}! ${poolUrl} 🏊‍♂️`;
 
   async function handleShare() {
-    // Try native share API first (mobile)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -26,16 +24,14 @@ export function ShareButton({ poolTitle, poolUrl }: ShareButtonProps) {
         });
         return;
       } catch (err) {
-        // User cancelled share — fall through to clipboard
         if ((err as Error).name === "AbortError") return;
       }
     }
 
-    // Fallback: copy to clipboard
     try {
       await navigator.clipboard.writeText(shareText);
       setCopied(true);
-      toast.success("Link copiado! Envie para o grupo 🎉");
+      toast.success("Link copiado!");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Não foi possível copiar o link.");
@@ -43,22 +39,16 @@ export function ShareButton({ poolTitle, poolUrl }: ShareButtonProps) {
   }
 
   return (
-    <Button
+    <button
       onClick={handleShare}
-      variant="outline"
-      className="w-full h-11 border-sky-200 text-sky-600 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 font-semibold transition-all duration-200 group"
+      className="p-2 -mr-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+      aria-label="Compartilhar"
     >
       {copied ? (
-        <>
-          <Check className="h-4 w-4 mr-2 text-emerald-500" />
-          Copiado!
-        </>
+        <Check className="h-5 w-5 text-emerald-500" />
       ) : (
-        <>
-          <Share2 className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-          💸 Rachar com a Galera
-        </>
+        <Share2 className="h-5 w-5" />
       )}
-    </Button>
+    </button>
   );
 }
