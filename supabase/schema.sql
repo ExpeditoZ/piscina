@@ -343,10 +343,128 @@ GRANT SELECT ON calendar_bookings TO anon, authenticated;
 
 
 -- ============================================================
+-- 13. CUSTOM TYPE: invoice_status
+-- ============================================================
+DO $$ BEGIN
+  CREATE TYPE invoice_status AS ENUM ('pending', 'approved', 'expired', 'cancelled');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+
+-- ============================================================
+-- 14. TABLE: host_subscriptions
+-- Tracks the current subscription state for each host.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS host_subscriptions (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id     UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  plan_name   TEXT NOT NULL DEFAULT 'mensal',
+  plan_price  NUMERIC(10, 2) NOT NULL DEFAULT 49.90,
+  status      TEXT NOT NULL DEFAULT 'inactive',  -- inactive | active | expired
+  starts_at   TIMESTAMPTZ,
+  expires_at  TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sub_user ON host_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sub_status ON host_subscriptions(status);
+
+-- RLS
+ALTER TABLE host_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Hosts can read own subscription" ON host_subscriptions;
+CREATE POLICY "Hosts can read own subscription"
+  ON host_subscriptions
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Only service_role can insert/update (via API routes)
+
+
+-- ============================================================
+-- 15. TABLE: host_invoices
+-- Tracks each PIX payment attempt.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS host_invoices (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id              UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subscription_id      UUID REFERENCES host_subscriptions(id) ON DELETE SET NULL,
+  amount               NUMERIC(10, 2) NOT NULL,
+  description          TEXT NOT NULL DEFAULT 'Assinatura mensal - AlugueSuaPiscina',
+  status               invoice_status NOT NULL DEFAULT 'pending',
+
+  -- Mercado Pago data
+  mp_payment_id        TEXT,         -- Mercado Pago payment ID
+  mp_qr_code           TEXT,         -- PIX copia-e-cola
+  mp_qr_code_base64    TEXT,         -- QR code image (base64)
+  mp_status            TEXT,         -- raw MP status
+
+  -- Timestamps
+  paid_at              TIMESTAMPTZ,
+  expires_at           TIMESTAMPTZ,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoice_user ON host_invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_status ON host_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoice_mp_id ON host_invoices(mp_payment_id);
+
+-- RLS
+ALTER TABLE host_invoices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Hosts can read own invoices" ON host_invoices;
+CREATE POLICY "Hosts can read own invoices"
+  ON host_invoices
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Only service_role can insert/update (via API routes)
+
+
+-- ============================================================
+-- 16. FUNCTION: Check and suspend expired subscriptions
+-- Called by the daily cron job.
+-- ============================================================
+CREATE OR REPLACE FUNCTION check_expired_subscriptions()
+RETURNS void AS $$
+BEGIN
+  -- Mark expired subscriptions
+  UPDATE host_subscriptions
+  SET status = 'expired', updated_at = NOW()
+  WHERE status = 'active'
+    AND expires_at < NOW();
+
+  -- Suspend pools whose owner subscription expired
+  UPDATE pools
+  SET status = 'suspended', updated_at = NOW()
+  WHERE status = 'active'
+    AND owner_id IN (
+      SELECT user_id FROM host_subscriptions
+      WHERE status = 'expired'
+    );
+
+  -- Also mark pending invoices as expired if older than 30 min
+  UPDATE host_invoices
+  SET status = 'expired'
+  WHERE status = 'pending'
+    AND created_at < NOW() - INTERVAL '30 minutes';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ============================================================
 -- SCHEMA COMPLETE!
 -- ============================================================
 -- Next steps:
 -- 1. Enable the "pg_cron" extension in Supabase Dashboard if available
 -- 2. Enable Realtime for the 'bookings' table in Supabase Dashboard
+-- 3. Fill in your .env.local with your Supabase project URL and keys
+-- 4. Create a host account via /host/signup
+-- 5. Configure Mercado Pago webhook URL in their dashboard
+
 -- 3. Fill in your .env.local with your Supabase project URL and keys
 -- 4. Create an owner account via Supabase Auth (email/password)

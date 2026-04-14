@@ -12,8 +12,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - API routes for webhooks (telegram, cron)
+     * - API routes for webhooks (telegram, cron, mercadopago)
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/telegram-webhook|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/telegram-webhook|api/mercadopago-webhook|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

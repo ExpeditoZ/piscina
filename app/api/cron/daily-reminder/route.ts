@@ -34,6 +34,18 @@ export async function GET(request: Request) {
 
     const cleanedCount = cleanedUp?.length ?? 0;
 
+    // ===== STEP 1b: Check for expired subscriptions =====
+    // Calls the DB function that:
+    // - Marks expired subscriptions as 'expired'
+    // - Suspends active pools whose subscription expired
+    // - Expires stale pending invoices (> 30 min)
+    const { error: subError } = await supabase.rpc(
+      "check_expired_subscriptions"
+    );
+    if (subError) {
+      console.error("Subscription expiry check failed:", subError);
+    }
+
     // ===== STEP 2: Send reminders for tomorrow's bookings =====
     if (!botToken) {
       return Response.json({

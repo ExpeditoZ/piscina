@@ -37,7 +37,8 @@ export async function updateSession(request: NextRequest) {
   // Protect /host/dashboard routes — redirect to login if not authenticated
   if (
     !user &&
-    request.nextUrl.pathname.startsWith("/host/dashboard")
+    (request.nextUrl.pathname.startsWith("/host/dashboard") ||
+      request.nextUrl.pathname.startsWith("/host/billing"))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/host/login";
