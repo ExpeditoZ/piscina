@@ -12,6 +12,11 @@ import {
   TrendingUp,
   Users,
   DollarSign,
+  Camera,
+  Send,
+  ScrollText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -260,6 +265,139 @@ export default async function HostDashboard() {
                 </CardContent>
               </Card>
             )}
+
+            {/* ====== QUICK ACTIONS ====== */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <Link
+                href="/host/billing"
+                className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-sky-200 transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-sky-50 group-hover:bg-sky-100 transition-colors">
+                  <CreditCard className="h-4 w-4 text-sky-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Assinatura</p>
+                  <p className="text-[10px] text-slate-400">
+                    {status === "active" ? "Ativa" : status === "suspended" ? "Expirada" : "Configurar"}
+                  </p>
+                </div>
+              </Link>
+
+              {status === "active" && (
+                <Link
+                  href={`/pool/${pool.id}`}
+                  className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-200 transition-all group"
+                >
+                  <div className="p-2 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+                    <ExternalLink className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700">Ver anúncio</p>
+                    <p className="text-[10px] text-slate-400">Página pública</p>
+                  </div>
+                </Link>
+              )}
+
+              <a
+                href="#photos-section"
+                className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-purple-200 transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors">
+                  <Camera className="h-4 w-4 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Fotos</p>
+                  <p className="text-[10px] text-slate-400">{pool.photos?.length || 0} fotos</p>
+                </div>
+              </a>
+
+              <a
+                href="#pricing-section"
+                className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-amber-200 transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-amber-50 group-hover:bg-amber-100 transition-colors">
+                  <DollarSign className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Preços</p>
+                  <p className="text-[10px] text-slate-400">R$ {pool.pricing?.weekday}/dia</p>
+                </div>
+              </a>
+
+              <a
+                href="#telegram-guide"
+                className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-200 transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors">
+                  <Send className="h-4 w-4 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Telegram</p>
+                  <p className="text-[10px] text-slate-400">
+                    {pool.telegram_chat_id ? "Conectado" : "Configurar"}
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="#rules-section"
+                className="flex items-center gap-2.5 p-3 rounded-xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-slate-300 transition-all group"
+              >
+                <div className="p-2 rounded-lg bg-slate-50 group-hover:bg-slate-100 transition-colors">
+                  <ScrollText className="h-4 w-4 text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Regras</p>
+                  <p className="text-[10px] text-slate-400">
+                    {pool.rules ? "Configuradas" : "Adicionar"}
+                  </p>
+                </div>
+              </a>
+            </div>
+
+            {/* ====== TELEGRAM GUIDE ====== */}
+            <div id="telegram-guide">
+              <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-sky-50 overflow-hidden">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-100 flex-shrink-0">
+                      <Send className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-bold text-slate-800 mb-1">
+                        Receba alertas de reservas via Telegram
+                      </h3>
+                      <p className="text-xs text-slate-500 mb-3">
+                        Configure em 2 minutos para ser notificado instantaneamente quando alguém solicitar uma reserva.
+                      </p>
+                      <div className="space-y-2.5 mb-3">
+                        <div className="flex items-start gap-2">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">1</span>
+                          <p className="text-xs text-slate-600">
+                            Abra o Telegram e procure por <code className="bg-white px-1 py-0.5 rounded text-blue-600 font-semibold">@BotFather</code>
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
+                          <p className="text-xs text-slate-600">
+                            Inicie uma conversa com o bot da plataforma (link será fornecido)
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">3</span>
+                          <p className="text-xs text-slate-600">
+                            Copie o Chat ID e cole no campo &quot;Telegram Chat ID&quot; no formulário abaixo
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        Dica: Cada reserva pode ser confirmada ou rejeitada diretamente pelo Telegram.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Pool title + form */}
             <div className="flex items-center gap-3">

@@ -12,6 +12,11 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Star,
+  Zap,
+  Calendar,
+  Shield,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,6 +221,38 @@ export default function BillingPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* VALUE PROPOSITION — shown when not subscribed */}
+        {!isActive && (
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-sky-50 to-cyan-50 overflow-hidden">
+            <CardContent className="p-6">
+              <h3 className="text-base font-bold text-slate-800 mb-1">
+                O que está incluído na sua assinatura
+              </h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Tudo que você precisa para transformar sua piscina em renda.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { icon: Star, label: "Anúncio público", desc: "Visível no catálogo" },
+                  { icon: Calendar, label: "Calendário", desc: "Turnos, diárias, períodos" },
+                  { icon: MessageCircle, label: "WhatsApp", desc: "Reserva direta" },
+                  { icon: Zap, label: "Telegram", desc: "Alertas em tempo real" },
+                  { icon: Shield, label: "Sem comissão", desc: "100% da reserva é sua" },
+                  { icon: CheckCircle2, label: "Extras e regras", desc: "Totalmente personalizado" },
+                ].map(({ icon: Icon, label, desc }) => (
+                  <div key={label} className="flex items-start gap-2 p-2.5 rounded-lg bg-white/60">
+                    <Icon className="h-4 w-4 text-sky-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-slate-700">{label}</p>
+                      <p className="text-[10px] text-slate-400">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* PIX Payment Section */}
         <Card className="border-0 shadow-lg bg-white">

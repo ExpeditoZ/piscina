@@ -58,6 +58,26 @@ export interface UpsellExtra {
   billing?: ExtraBilling; // default: "per_reservation"
 }
 
+// ---- Geography ----
+export interface Region {
+  id: string;
+  name: string;
+  slug: string;
+  state: string;
+  latitude: number | null;
+  longitude: number | null;
+  sort_order: number;
+}
+
+export interface City {
+  id: string;
+  region_id: string;
+  name: string;
+  slug: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 // ---- Pool ----
 export type PoolStatus = "draft" | "pending_subscription" | "active" | "suspended";
 
@@ -67,6 +87,7 @@ export interface Pool {
   title: string;
   neighborhood: string;
   city: string;
+  city_id: string | null;
   exact_address: string | null;
   key_lockbox_instructions: string | null;
   owner_whatsapp: string | null;
@@ -81,12 +102,20 @@ export interface Pool {
   updated_at: string;
 }
 
-// Public-safe version of Pool (no private fields)
+// Public-safe version of Pool (from public_pools view)
 export interface PoolPublic {
   id: string;
   title: string;
   neighborhood: string;
   city: string;
+  city_id: string | null;
+  city_name: string | null;
+  city_slug: string | null;
+  city_latitude: number | null;
+  city_longitude: number | null;
+  region_id: string | null;
+  region_name: string | null;
+  region_slug: string | null;
   photos: string[];
   pricing: Pricing;
   shifts_config: ShiftsConfig | null;

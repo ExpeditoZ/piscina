@@ -62,7 +62,64 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
--- 4. TABLE: pools
+-- 4A. TABLE: regions
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.regions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'PE',
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_regions_slug ON public.regions(slug);
+
+-- ============================================================
+-- 4B. TABLE: cities
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.cities (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  region_id UUID NOT NULL REFERENCES public.regions(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cities_region_slug ON public.cities(region_id, slug);
+CREATE INDEX IF NOT EXISTS idx_cities_region_id ON public.cities(region_id);
+
+-- ============================================================
+-- 4C. SEED: initial geography (Recife region)
+-- ============================================================
+INSERT INTO public.regions (name, slug, state, latitude, longitude, sort_order)
+VALUES ('Recife e Região', 'recife', 'PE', -8.0476, -34.8770, 1)
+ON CONFLICT (slug) DO NOTHING;
+
+DO $$
+DECLARE
+  v_region_id UUID;
+BEGIN
+  SELECT id INTO v_region_id FROM public.regions WHERE slug = 'recife';
+  IF v_region_id IS NOT NULL THEN
+    INSERT INTO public.cities (region_id, name, slug, latitude, longitude) VALUES
+      (v_region_id, 'Boa Viagem', 'boa-viagem', -8.1167, -34.8994),
+      (v_region_id, 'Recife', 'recife', -8.0476, -34.8770),
+      (v_region_id, 'Olinda', 'olinda', -7.9907, -34.8417),
+      (v_region_id, 'Jaboatão dos Guararapes', 'jaboatao', -8.1808, -35.0154),
+      (v_region_id, 'Paulista', 'paulista', -7.9367, -34.8694)
+    ON CONFLICT (region_id, slug) DO NOTHING;
+  END IF;
+END $$;
+
+-- ============================================================
+-- 4D. TABLE: pools
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.pools (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -79,6 +136,7 @@ CREATE TABLE IF NOT EXISTS public.pools (
   rules TEXT DEFAULT NULL,
   upsell_extras JSONB DEFAULT NULL,
   telegram_chat_id TEXT DEFAULT NULL,
+  city_id UUID REFERENCES public.cities(id),
   status public.pool_status NOT NULL DEFAULT 'draft',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -98,9 +156,20 @@ ALTER TABLE public.pools
   ADD COLUMN IF NOT EXISTS rules TEXT DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS upsell_extras JSONB DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS city_id UUID REFERENCES public.cities(id),
   ADD COLUMN IF NOT EXISTS status public.pool_status DEFAULT 'draft',
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Backfill city_id for existing pools that have city = 'Boa Viagem'
+UPDATE public.pools
+SET city_id = (
+  SELECT c.id FROM public.cities c
+  JOIN public.regions r ON r.id = c.region_id
+  WHERE c.slug = 'boa-viagem' AND r.slug = 'recife'
+  LIMIT 1
+)
+WHERE city_id IS NULL AND city = 'Boa Viagem';
 
 UPDATE public.pools
 SET city = 'São Paulo'
@@ -137,6 +206,7 @@ ALTER TABLE public.pools
 CREATE INDEX IF NOT EXISTS idx_pools_owner_id ON public.pools(owner_id);
 CREATE INDEX IF NOT EXISTS idx_pools_status ON public.pools(status);
 CREATE INDEX IF NOT EXISTS idx_pools_city_neighborhood ON public.pools(city, neighborhood);
+CREATE INDEX IF NOT EXISTS idx_pools_city_id ON public.pools(city_id);
 
 DROP TRIGGER IF EXISTS trigger_pools_updated_at ON public.pools;
 CREATE TRIGGER trigger_pools_updated_at
@@ -554,20 +624,46 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP VIEW IF EXISTS public.public_pools;
 CREATE VIEW public.public_pools AS
 SELECT
-  id,
-  title,
-  neighborhood,
-  city,
-  photos,
-  pricing,
-  shifts_config,
-  rules,
-  upsell_extras,
-  created_at
-FROM public.pools
-WHERE status = 'active';
+  p.id,
+  p.title,
+  p.neighborhood,
+  p.city,
+  p.city_id,
+  c.name AS city_name,
+  c.slug AS city_slug,
+  c.latitude AS city_latitude,
+  c.longitude AS city_longitude,
+  r.id AS region_id,
+  r.name AS region_name,
+  r.slug AS region_slug,
+  p.photos,
+  p.pricing,
+  p.shifts_config,
+  p.rules,
+  p.upsell_extras,
+  p.created_at
+FROM public.pools p
+LEFT JOIN public.cities c ON c.id = p.city_id
+LEFT JOIN public.regions r ON r.id = c.region_id
+WHERE p.status = 'active';
 
 GRANT SELECT ON public.public_pools TO anon, authenticated;
+GRANT SELECT ON public.regions TO anon, authenticated;
+GRANT SELECT ON public.cities TO anon, authenticated;
+
+-- RLS for regions (public read)
+ALTER TABLE public.regions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public can read active regions" ON public.regions;
+CREATE POLICY "Public can read active regions"
+  ON public.regions FOR SELECT TO anon, authenticated
+  USING (is_active = true);
+
+-- RLS for cities (public read)
+ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public can read active cities" ON public.cities;
+CREATE POLICY "Public can read active cities"
+  ON public.cities FOR SELECT TO anon, authenticated
+  USING (is_active = true);
 
 DROP VIEW IF EXISTS public.calendar_bookings;
 CREATE VIEW public.calendar_bookings AS

@@ -34,12 +34,19 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect /host/dashboard routes — redirect to login if not authenticated
+  // Protect /host/dashboard and /host/billing routes
   if (
     !user &&
     (request.nextUrl.pathname.startsWith("/host/dashboard") ||
       request.nextUrl.pathname.startsWith("/host/billing"))
   ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/host/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Protect /admin routes — require authentication (admin email check in layout)
+  if (!user && request.nextUrl.pathname.startsWith("/admin")) {
     const url = request.nextUrl.clone();
     url.pathname = "/host/login";
     return NextResponse.redirect(url);
