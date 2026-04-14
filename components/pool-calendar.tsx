@@ -79,12 +79,10 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
   const maxDate = addMonths(today, 3);
 
   useEffect(() => { (async () => { setLoadingWeather(true); setWeatherMap(createWeatherMap(await fetchWeather())); setLoadingWeather(false); })(); }, []);
-
   useEffect(() => { (async () => {
     const sb = createClient(); const { data } = await sb.from("calendar_bookings").select("booking_date, status").eq("pool_id", poolId);
     const m: BookingStatusMap = new Map(); (data as BookingCalendar[])?.forEach((b) => { if (b.status === "cancelled") return; const ex = m.get(b.booking_date); if (!ex || b.status === "confirmed") m.set(b.booking_date, b.status as "negotiating" | "confirmed"); }); setBookingStatuses(m);
   })(); }, [poolId]);
-
   useEffect(() => {
     const sb = createClient(); const ch = sb.channel(`bk-${poolId}`).on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `pool_id=eq.${poolId}` }, (p) => {
       const b = p.new as BookingCalendar & { pool_id: string }; if (!b?.booking_date) return;
@@ -98,29 +96,17 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
     if (st === "negotiating") { toast.warning("Alguém está negociando esta data! 🔥", { description: "Aguarde ou escolha outra data disponível." }); return; }
     const p = isWeekend(date) ? pricing.weekend : pricing.weekday; setSelectedDate(date); setCurrentPrice(p); onDateSelect(date, p);
   }, [bookingStatuses, pricing, onDateSelect]);
-
   const disabledDays = useCallback((d: Date) => isBefore(d, today) || bookingStatuses.get(format(d, "yyyy-MM-dd")) === "confirmed", [today, bookingStatuses]);
-
-  const modifiers = useMemo(() => {
-    const n: Date[] = []; const c: Date[] = [];
-    bookingStatuses.forEach((s, ds) => { const d = new Date(ds + "T12:00:00"); if (s === "negotiating") n.push(d); if (s === "confirmed") c.push(d); });
-    return { negotiating: n, confirmed: c };
-  }, [bookingStatuses]);
-
+  const modifiers = useMemo(() => { const n: Date[] = []; const c: Date[] = []; bookingStatuses.forEach((s, ds) => { const d = new Date(ds + "T12:00:00"); if (s === "negotiating") n.push(d); if (s === "confirmed") c.push(d); }); return { negotiating: n, confirmed: c }; }, [bookingStatuses]);
   const splitValue = useMemo(() => { const n = parseInt(splitCount); if (!currentPrice || !n || n < 2) return null; return Math.ceil(currentPrice / n); }, [currentPrice, splitCount]);
-
-  // Weather for selected date
-  const selectedWeather = useMemo(() => {
-    if (!selectedDate) return null;
-    return weatherMap.get(format(selectedDate, "yyyy-MM-dd")) ?? null;
-  }, [selectedDate, weatherMap]);
+  const selectedWeather = useMemo(() => { if (!selectedDate) return null; return weatherMap.get(format(selectedDate, "yyyy-MM-dd")) ?? null; }, [selectedDate, weatherMap]);
 
   return (
     <section id="calendar" className="scroll-mt-16 space-y-3">
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        {/* ── CENTERED CALENDAR STAGE ── */}
+        {/* CENTERED STAGE */}
         <div className="max-w-lg w-full mx-auto px-4 sm:px-6 pt-5 pb-4">
-          {/* Header — centered inside the stage */}
+          {/* Header */}
           <div className="flex items-center justify-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center flex-shrink-0">
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -131,7 +117,7 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
             {loadingWeather && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300 ml-1" />}
           </div>
 
-          {/* DayPicker */}
+          {/* DayPicker — rdp defaults overridden in globals.css */}
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -140,18 +126,20 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
             disabled={disabledDays}
             fromDate={today}
             toDate={maxDate}
-            showOutsideDays={false}
+            showOutsideDays
             modifiers={modifiers}
             classNames={{
-              root: "w-full",
+              root: "",
               months: "",
               month: "",
               nav: "hidden",
               month_caption: "",
               caption_label: "hidden",
-              weekdays: "grid grid-cols-7 gap-1.5 sm:gap-2 mb-2",
-              weekday: "text-center text-[11px] font-bold text-slate-400 uppercase py-1",
-              week: "grid grid-cols-7 gap-1.5 sm:gap-2 mb-1.5 sm:mb-2",
+              month_grid: "",
+              weekdays: "",
+              weekday: "text-center text-[11px] font-bold text-slate-400 uppercase",
+              weeks: "",
+              week: "",
               day: "",
               day_button: "w-full aspect-square rounded-xl text-sm font-semibold relative flex flex-col items-center justify-center transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400",
               disabled: "cursor-not-allowed",
@@ -219,7 +207,7 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
             }}
           />
 
-          {/* Legend — compact, secondary */}
+          {/* Legend */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-400">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200" /> Disponível</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-200 border border-amber-300" /> Negociando</span>
@@ -228,18 +216,15 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
           </div>
         </div>
 
-        {/* ── SELECTED DATE SUMMARY ── */}
+        {/* SELECTED DATE SUMMARY */}
         {selectedDate && currentPrice !== null && (
           <div className="border-t border-slate-100 bg-slate-50/60">
             <div className="max-w-lg mx-auto px-4 sm:px-6 py-4">
-              {/* Main row: Date info + Price */}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-bold text-slate-800 capitalize leading-snug">
                     {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
                   </p>
-
-                  {/* Weather — clearly visible */}
                   {selectedWeather ? (
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <span className="text-lg leading-none">{getWeatherIcon(selectedWeather.weatherCode)}</span>
@@ -253,14 +238,12 @@ export function PoolCalendar({ poolId, pricing, onDateSelect }: PoolCalendarProp
                     <p className="text-[12px] text-slate-400 mt-1">Previsão indisponível</p>
                   )}
                 </div>
-
                 <div className="text-right flex-shrink-0">
                   <p className="text-2xl font-black text-sky-600 leading-none">R$ {currentPrice}</p>
                   <p className="text-[10px] text-slate-400 mt-1">/dia</p>
                 </div>
               </div>
 
-              {/* Split calculator */}
               <div className="mt-4 pt-3 border-t border-dashed border-slate-200">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
