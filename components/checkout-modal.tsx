@@ -27,7 +27,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
 import type {
   PoolPublic,
   ShiftOption,
@@ -123,7 +122,7 @@ export function CheckoutModal({
     return true;
   }, [guestName, arrivalTime, hasRules, rulesAccepted]);
 
-  // ----- Submit: Insert booking + Get WhatsApp URL from API -----
+  // ----- Submit: Create booking via server API (price recalculated server-side) -----
   async function handleSubmit() {
     if (!canSubmit || !selectedDate || isSubmitting) return;
 
@@ -138,45 +137,7 @@ export function CheckoutModal({
       // 1. Save guest name to localStorage
       localStorage.setItem("guestName", guestName.trim());
 
-      // 2. Build upsells array for DB
-      const upsellsForDB = hasExtras
-        ? pool.upsell_extras!
-            .filter((e) => selectedUpsells.has(e.id))
-            .map((e) => ({ id: e.id, name: e.name, price: e.price }))
-        : null;
-
-      // 3. Insert booking with status='negotiating'
-      const supabase = createClient();
-      const { data: insertedBooking, error: insertError } = await supabase
-        .from("bookings")
-        .insert({
-          pool_id: pool.id,
-          guest_name: guestName.trim(),
-          arrival_time: arrivalTime,
-          booking_date: dateStr,
-          shift_selected: selectedShift?.name ?? null,
-          total_price: totalPrice,
-          selected_upsells: upsellsForDB,
-          status: "negotiating",
-        })
-        .select("id")
-        .single();
-
-      if (insertError) {
-        // Handle double-booking conflict
-        if (insertError.code === "23505") {
-          toast.error(
-            "Esta data já está reservada ou em negociação. Escolha outra data."
-          );
-        } else {
-          console.error("Booking insert error:", insertError);
-          toast.error("Erro ao registrar reserva. Tente novamente.");
-        }
-        setIsSubmitting(false);
-        return;
-      }
-
-      // 4. Build WhatsApp message text (phone number stays server-side)
+      // 2. Build WhatsApp message text (phone number stays server-side)
       const upsellNames = hasExtras
         ? pool
             .upsell_extras!.filter((e) => selectedUpsells.has(e.id))
@@ -202,31 +163,39 @@ export function CheckoutModal({
         .filter(Boolean)
         .join(". ");
 
-      // 5. Call API to notify owner + get WhatsApp redirect URL
-      const notifyRes = await fetch("/api/notify-owner", {
+      // 3. Call unified booking API (price is recalculated server-side)
+      const res = await fetch("/api/create-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           poolId: pool.id,
-          bookingId: insertedBooking.id,
           guestName: guestName.trim(),
-          bookingDate: formattedDate,
-          totalPrice,
+          arrivalTime,
+          bookingDate: dateStr,
           shiftSelected: selectedShift?.name ?? null,
+          selectedUpsellIds: hasExtras
+            ? Array.from(selectedUpsells)
+            : [],
           whatsappMessage,
         }),
       });
 
-      const notifyData = await notifyRes.json();
+      const data = await res.json();
 
-      // 6. Show success toast + redirect to WhatsApp
+      if (!res.ok) {
+        toast.error(data.error || "Erro ao registrar reserva.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Show success toast + redirect to WhatsApp
       toast.success("Reserva registrada! Redirecionando para o WhatsApp...", {
         icon: <PartyPopper className="h-4 w-4" />,
       });
 
       setTimeout(() => {
-        if (notifyData.whatsappUrl) {
-          window.open(notifyData.whatsappUrl, "_blank");
+        if (data.whatsappUrl) {
+          window.open(data.whatsappUrl, "_blank");
         } else {
           toast.info(
             "O proprietário foi notificado. Aguarde o contato via WhatsApp."

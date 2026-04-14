@@ -6,10 +6,25 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * inline keyboard buttons (Confirm / Reject).
  *
  * Callback data format: "confirm_{poolId}_{bookingDate}" or "reject_{poolId}_{bookingDate}"
+ *
+ * SECURITY: Verifies X-Telegram-Bot-Api-Secret-Token header.
+ * When registering the webhook, pass ?secret_token=YOUR_SECRET to Telegram's setWebhook API.
  */
 export async function POST(request: Request) {
   try {
+    // Verify Telegram secret token (set when registering the webhook)
+    const telegramSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (telegramSecret) {
+      const headerSecret = request.headers.get(
+        "x-telegram-bot-api-secret-token"
+      );
+      if (headerSecret !== telegramSecret) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const body = await request.json();
+
 
     // Handle callback_query from inline keyboard
     const callbackQuery = body.callback_query;

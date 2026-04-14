@@ -116,16 +116,25 @@ ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 -- 6. RLS POLICIES: pools
 -- ============================================================
 
--- PUBLIC: Anyone can read pool listings (only public columns via SELECT)
--- NOTE: We use a view or frontend column selection to hide private fields.
--- The RLS policy allows SELECT on all columns, but the API/frontend
--- MUST only request public columns for guest-facing pages.
+-- ANON: Anonymous users should NOT directly query the pools table.
+-- They must use the public_pools view (which excludes private columns).
+-- This policy restricts anon to ZERO rows on the raw table.
 DROP POLICY IF EXISTS "Public can view pools" ON pools;
-CREATE POLICY "Public can view pools"
+DROP POLICY IF EXISTS "Anon cannot read pools directly" ON pools;
+CREATE POLICY "Anon cannot read pools directly"
   ON pools
   FOR SELECT
-  TO anon, authenticated
-  USING (true);
+  TO anon
+  USING (false);
+
+-- AUTHENTICATED: Owners can read only their own pools (full access to all columns)
+DROP POLICY IF EXISTS "Owners can read own pools" ON pools;
+CREATE POLICY "Owners can read own pools"
+  ON pools
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = owner_id);
+
 
 -- OWNERS: Authenticated users can insert their own pools
 DROP POLICY IF EXISTS "Owners can insert own pools" ON pools;
@@ -281,9 +290,14 @@ CREATE POLICY "Owners can delete pool photos"
 
 -- ============================================================
 -- 11. HELPER VIEW: Public Pool Listings
--- Excludes private columns for safe use in guest-facing queries.
+-- SECURITY MODEL: anon users CANNOT query the raw pools table (RLS blocks them).
+-- They MUST use this view, which only exposes safe public columns.
+-- The view uses the OWNER's permissions (bypasses RLS) so it can read from pools.
 -- ============================================================
-CREATE OR REPLACE VIEW public_pools AS
+DROP VIEW IF EXISTS public_pools;
+CREATE VIEW public_pools
+  WITH (security_invoker = false)
+AS
 SELECT
   id,
   title,
@@ -299,6 +313,7 @@ FROM pools;
 
 -- Grant read access to the view
 GRANT SELECT ON public_pools TO anon, authenticated;
+
 
 
 -- ============================================================
