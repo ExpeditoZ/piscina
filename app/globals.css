@@ -131,54 +131,64 @@
 
 /*
   Pool Calendar — Override react-day-picker v9 defaults.
-  The library sets fixed widths (44px days, 42px buttons, fit-content months)
-  that prevent the calendar from being fluid and centered.
+  
+  DayPicker v9 uses CSS Modules, so actual class names are HASHED
+  (e.g., .day_abc123) and .rdp-day selectors DON'T match.
+  
+  Solution: target elements by TYPE within the DayPicker structure,
+  since the DOM structure is fixed: div > table > thead/tbody > tr > td > button.
+  Scoped to #calendar to avoid affecting other components.
 */
-#calendar .rdp-root {
-  --rdp-day-width: auto;
-  --rdp-day-height: auto;
-  --rdp-day_button-width: 100%;
-  --rdp-day_button-height: 100%;
-  --rdp-day_button-border-radius: 0.75rem;
-  --rdp-day_button-border: none;
-  --rdp-selected-border: none;
-  --rdp-disabled-opacity: 1;
-  --rdp-outside-opacity: 0;
-  --rdp-today-color: inherit;
-  --rdp-weekday-opacity: 1;
-  --rdp-weekday-padding: 0.25rem;
-}
 
-#calendar .rdp-months {
+/* Reset ALL width constraints in the DayPicker tree */
+#calendar [data-slot="day-picker"],
+#calendar [data-slot="day-picker"] > div {
+  width: 100% !important;
   max-width: 100% !important;
-  width: 100%;
 }
 
-#calendar .rdp-month {
-  width: 100%;
+/* The months flex container — kill fit-content */
+#calendar [data-slot="day-picker"] > div:first-child {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
 }
 
-#calendar .rdp-month_grid {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 4px;
+/* Month wrapper */
+#calendar [data-slot="day-picker"] > div > div {
+  width: 100% !important;
 }
 
-#calendar .rdp-day {
-  width: auto;
-  height: auto;
-  padding: 0;
+/* TABLE — the grid itself. table-layout: fixed is the key. */
+#calendar table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 6px !important;
 }
 
-#calendar .rdp-day_button {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+/* TH — weekday headers */
+#calendar table th {
+  width: auto !important;
+  padding: 4px !important;
+  text-align: center !important;
 }
 
-#calendar .rdp-weekday {
-  padding: 0.25rem;
+/* TD — day cells */
+#calendar table td {
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
 }
 
-#calendar .rdp-selected {
-  font-size: inherit;
+/* Day buttons inside TDs */
+#calendar table td > button {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Don't enlarge selected text */
+#calendar table td[data-selected] {
+  font-size: inherit !important;
 }
