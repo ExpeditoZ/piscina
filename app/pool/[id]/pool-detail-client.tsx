@@ -56,12 +56,14 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
       ? window.location.href
       : `https://aluguesuapiscina.com/pool/${pool.id}`;
 
+  // Only select the date — no modal
   const handleDateSelect = useCallback((date: Date, price: number) => {
     setSelectedDate(date);
     setSelectedPrice(price);
   }, []);
 
-  const handleOpenCheckout = useCallback(() => {
+  // CTA opens checkout or scrolls to calendar
+  const handleCTA = useCallback(() => {
     if (!selectedDate) {
       document
         .getElementById("calendar")
@@ -72,105 +74,95 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
   }, [selectedDate]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ===== HEADER ===== */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors p-2 -ml-2 rounded-xl hover:bg-slate-50 active:scale-95"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs font-medium">Voltar</span>
-          </button>
+    <>
+      {/* ===== PAGE WRAPPER — pb accounts for sticky bar height ===== */}
+      <div className="min-h-screen bg-slate-50 pb-[72px]">
+        {/* HEADER */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100">
+          <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
+            <button
+              onClick={() => router.back()}
+              className="p-2 -ml-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors active:scale-95"
+              aria-label="Voltar"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
 
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-          >
-            <Waves className="h-4 w-4 text-sky-500" />
-            <span className="font-bold text-sm bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">
-              AlugueSuaPiscina
-            </span>
-          </Link>
+            <Link href="/" className="flex items-center gap-1.5">
+              <Waves className="h-4 w-4 text-sky-500" />
+              <span className="font-bold text-sm bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">
+                AlugueSuaPiscina
+              </span>
+            </Link>
 
-          <ShareButton poolTitle={pool.title} poolUrl={poolUrl} />
-        </div>
-      </header>
+            <ShareButton poolTitle={pool.title} poolUrl={poolUrl} />
+          </div>
+        </header>
 
-      {/* ===== MAIN CONTENT ===== */}
-      <main className="max-w-2xl lg:max-w-4xl mx-auto">
-        {/* Carousel — edge-to-edge on mobile, padded on sm+ */}
-        <div className="sm:px-4 sm:pt-4">
+        {/* CAROUSEL — full bleed mobile, padded desktop */}
+        <div className="sm:max-w-2xl sm:lg:max-w-4xl sm:mx-auto sm:px-4 sm:pt-4">
           <ImageCarousel images={pool.photos} title={pool.title} />
         </div>
 
-        {/* All content sections */}
-        <div className="px-4 pt-4 pb-24 space-y-4">
-          {/* ===== TITLE + LOCATION ===== */}
+        {/* CONTENT */}
+        <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 pt-4 space-y-4">
+          {/* Title + Location */}
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
               {pool.title}
             </h1>
             <div className="flex items-center gap-1.5 mt-1">
               <MapPin className="h-3.5 w-3.5 text-sky-500 flex-shrink-0" />
-              <p className="text-[13px] text-slate-500">
+              <span className="text-[13px] text-slate-500">
                 {pool.neighborhood}, {pool.city}
-              </p>
+              </span>
             </div>
-
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               {viewerCount > 0 && (
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-100">
-                  <Flame className="h-3 w-3 text-red-500 animate-pulse" />
-                  <span className="text-[11px] font-semibold text-red-600">
-                    {viewerCount} vendo agora
-                  </span>
-                </div>
-              )}
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100">
-                <MessageCircle className="h-3 w-3 text-emerald-500" />
-                <span className="text-[11px] font-medium text-emerald-600">
-                  Via WhatsApp
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 border border-red-100 text-[11px] font-semibold text-red-600">
+                  <Flame className="h-3 w-3 animate-pulse" />
+                  {viewerCount} vendo agora
                 </span>
-              </div>
+              )}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-100 text-[11px] font-medium text-emerald-600">
+                <MessageCircle className="h-3 w-3" />
+                Via WhatsApp
+              </span>
             </div>
           </div>
 
-          {/* ===== PRICING ===== */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* Pricing */}
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 Dia de semana
               </p>
-              <p className="text-lg font-black text-slate-800">
+              <p className="text-lg font-extrabold text-slate-800 mt-0.5">
                 R$ {pool.pricing.weekday}
               </p>
             </div>
-            <div className="bg-orange-50/70 rounded-xl p-3 border border-orange-100 text-center">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-orange-500 mb-0.5">
+            <div className="bg-orange-50/60 rounded-xl p-3 border border-orange-100 text-center">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-orange-500">
                 Fim de semana
               </p>
-              <p className="text-lg font-black text-orange-700">
+              <p className="text-lg font-extrabold text-orange-700 mt-0.5">
                 R$ {pool.pricing.weekend}
               </p>
             </div>
           </div>
 
-          {/* ===== CALENDAR ===== */}
+          {/* Calendar */}
           <PoolCalendar
             poolId={pool.id}
             pricing={pool.pricing}
             onDateSelect={handleDateSelect}
           />
 
-          {/* ===== SHIFTS ===== */}
+          {/* Shifts */}
           {hasShifts && (
-            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-100">
               <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                <div className="p-1 rounded-md bg-amber-50">
-                  <Clock className="h-3.5 w-3.5 text-amber-500" />
-                </div>
+                <Clock className="h-4 w-4 text-amber-500" />
                 <h2 className="font-bold text-[13px] text-slate-800">
                   Turnos Disponíveis
                 </h2>
@@ -179,7 +171,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
                 {pool.shifts_config!.options.map((shift, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
+                    className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
                   >
                     <span className="text-[13px] text-slate-700 font-medium">
                       {shift.name}
@@ -193,13 +185,11 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             </div>
           )}
 
-          {/* ===== EXTRAS ===== */}
+          {/* Extras */}
           {hasExtras && (
-            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-100">
               <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                <div className="p-1 rounded-md bg-purple-50">
-                  <ShoppingBag className="h-3.5 w-3.5 text-purple-500" />
-                </div>
+                <ShoppingBag className="h-4 w-4 text-purple-500" />
                 <h2 className="font-bold text-[13px] text-slate-800">
                   Extras Disponíveis
                 </h2>
@@ -208,7 +198,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
                 {pool.upsell_extras!.map((extra) => (
                   <div
                     key={extra.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
+                    className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
                   >
                     <span className="text-[13px] text-slate-600">
                       {extra.name}
@@ -222,85 +212,72 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             </div>
           )}
 
-          {/* ===== RULES ===== */}
+          {/* Rules */}
           {hasRules && (
-            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-100">
               <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                <div className="p-1 rounded-md bg-slate-100">
-                  <ScrollText className="h-3.5 w-3.5 text-slate-500" />
-                </div>
+                <ScrollText className="h-4 w-4 text-slate-400" />
                 <h2 className="font-bold text-[13px] text-slate-800">
                   Regras da Piscina
                 </h2>
               </div>
               <div className="px-4 pb-3">
-                <p className="text-[12px] text-slate-600 leading-relaxed whitespace-pre-line">
+                <p className="text-[12px] text-slate-500 leading-relaxed whitespace-pre-line">
                   {pool.rules}
                 </p>
               </div>
             </div>
           )}
-        </div>
-      </main>
 
-      {/* ===== STICKY BOTTOM CTA ===== */}
-      {/*
-        Structure: fixed at bottom, always visible.
-        Uses pb-[env(safe-area-inset-bottom)] for iOS notch.
-        z-50 to be above everything except modals.
-        Height: ~64px on mobile. Content area never overlaps thanks to pb-24 above.
+          {/* Footer */}
+          <div className="pt-4 pb-2 text-center">
+            <p className="text-[10px] text-slate-300">
+              © {new Date().getFullYear()} AlugueSuaPiscina
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== STICKY BOTTOM CTA =====
+          OUTSIDE the scroll container.
+          fixed + bottom-0 + z-50.
+          pb-[72px] on the page body keeps content from hiding behind this.
       */}
       {!checkoutOpen && (
         <div
-          className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200"
+          className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200"
           style={{
-            boxShadow: "0 -2px 16px rgba(0,0,0,0.06)",
+            boxShadow: "0 -2px 12px rgba(0,0,0,0.08)",
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
           }}
         >
-          <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 py-2.5 flex items-center gap-3">
+          <div className="max-w-2xl lg:max-w-4xl mx-auto flex items-center justify-between gap-3 px-4 py-2.5">
             {/* Price */}
-            <div className="flex-1 min-w-0">
-              {selectedDate ? (
-                <>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">
-                    Selecionado
-                  </p>
-                  <p className="text-base font-black text-slate-800 leading-tight mt-0.5">
-                    R$ {selectedPrice}
-                    <span className="text-[10px] font-normal text-slate-400 ml-0.5">
-                      /dia
-                    </span>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">
-                    A partir de
-                  </p>
-                  <p className="text-base font-black text-slate-800 leading-tight mt-0.5">
-                    R$ {minPrice}
-                    <span className="text-[10px] font-normal text-slate-400 ml-0.5">
-                      /dia
-                    </span>
-                  </p>
-                </>
-              )}
+            <div>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                {selectedDate ? "Selecionado" : "A partir de"}
+              </p>
+              <p className="text-lg font-extrabold text-slate-800 leading-tight">
+                R$ {selectedDate ? selectedPrice : minPrice}
+                <span className="text-[10px] font-normal text-slate-400 ml-0.5">
+                  /dia
+                </span>
+              </p>
             </div>
 
-            {/* CTA */}
+            {/* Button */}
             <button
-              onClick={handleOpenCheckout}
-              className={`flex-shrink-0 flex items-center justify-center gap-1.5 h-11 px-5 sm:px-7 rounded-xl font-bold text-[13px] sm:text-[14px] transition-all duration-150 active:scale-[0.96] ${
+              onClick={handleCTA}
+              className={`h-11 px-5 sm:px-6 rounded-xl font-bold text-[14px] flex items-center gap-1.5 transition-colors active:scale-[0.97] ${
                 selectedDate
-                  ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-300/40"
-                  : "bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-300/40"
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  : "bg-sky-500 hover:bg-sky-600 text-white"
               }`}
             >
               {selectedDate ? (
                 <>
-                  Reservar agora
-                  <ChevronRight className="h-4 w-4 -mr-0.5" />
+                  Reservar
+                  <ChevronRight className="h-4 w-4" />
                 </>
               ) : (
                 "Escolher data"
@@ -310,7 +287,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
         </div>
       )}
 
-      {/* ===== CHECKOUT ===== */}
+      {/* CHECKOUT MODAL */}
       <CheckoutModal
         pool={pool}
         selectedDate={selectedDate}
@@ -318,15 +295,6 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
       />
-
-      {/* ===== FOOTER ===== */}
-      <footer className="border-t border-slate-100 bg-white">
-        <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 py-5 text-center">
-          <p className="text-[11px] text-slate-400">
-            © {new Date().getFullYear()} AlugueSuaPiscina
-          </p>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 }
