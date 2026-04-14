@@ -68,12 +68,18 @@ export async function POST(request: Request) {
     }
 
     // Parse callback data
+    // Format: "confirm_{poolId}_{startDate}" or "confirm_{poolId}_{startDate}_{endDate}"
     const parts = data.split("_");
     const action = parts[0]; // "confirm" or "reject"
     const poolId = parts[1];
-    const bookingDate = parts.slice(2).join("_"); // e.g. "2026-04-20"
+    // Dates: could be "2026-04-20" or "2026-04-20_2026-04-23"
+    const datesPart = parts.slice(2).join("_");
+    const dateParts = datesPart.split("_");
+    const startDate = dateParts[0]; // e.g. "2026-04-20"
+    const endDate = dateParts.length > 1 ? dateParts[1] : startDate;
+    const isRangeBooking = startDate !== endDate;
 
-    if (!action || !poolId || !bookingDate) {
+    if (!action || !poolId || !startDate) {
       await answerCallback(botToken, callbackQuery.id, "❌ Dados inválidos");
       return Response.json({ ok: true });
     }
@@ -86,9 +92,10 @@ export async function POST(request: Request) {
         .from("bookings")
         .update({ status: "confirmed" })
         .eq("pool_id", poolId)
-        .eq("booking_date", bookingDate)
+        .eq("start_date", startDate)
+        .eq("end_date", endDate)
         .eq("status", "negotiating")
-        .select("guest_name, arrival_time")
+        .select("guest_name, arrival_time, booking_mode, total_days")
         .limit(1);
 
       if (updateError) {
@@ -114,13 +121,17 @@ export async function POST(request: Request) {
       await answerCallback(
         botToken,
         callbackQuery.id,
-        "✅ Data confirmada e bloqueada!"
+        "✅ Reserva confirmada e bloqueada!"
       );
 
       // Update the original message to remove buttons
+      const dateLabel = isRangeBooking
+        ? `${startDate} → ${endDate} (${booking?.total_days ?? "?"} dias)`
+        : startDate;
+
       const confirmMsg =
         `✅ *Reserva Confirmada!*\n\n` +
-        `A data *${bookingDate}* foi bloqueada no calendário.\n\n` +
+        `📅 ${isRangeBooking ? "Período" : "Data"}: *${dateLabel}*\n\n` +
         (booking
           ? `👤 Hóspede: *${booking.guest_name}*\n` +
             `⏰ Chegada: *${booking.arrival_time}*\n\n`
@@ -136,7 +147,8 @@ export async function POST(request: Request) {
         .from("bookings")
         .update({ status: "cancelled" })
         .eq("pool_id", poolId)
-        .eq("booking_date", bookingDate)
+        .eq("start_date", startDate)
+        .eq("end_date", endDate)
         .eq("status", "negotiating");
 
       if (updateError) {
@@ -148,6 +160,10 @@ export async function POST(request: Request) {
         );
         return Response.json({ ok: true });
       }
+
+      const dateLabel = isRangeBooking
+        ? `${startDate} → ${endDate}`
+        : startDate;
 
       // Answer callback
       await answerCallback(
@@ -161,7 +177,7 @@ export async function POST(request: Request) {
         botToken,
         chatId,
         messageId,
-        `❌ *Reserva Rejeitada*\n\nA data *${bookingDate}* foi liberada no calendário.`
+        `❌ *Reserva Rejeitada*\n\nA ${isRangeBooking ? "período" : "data"} *${dateLabel}* foi liberada.`
       );
     }
 

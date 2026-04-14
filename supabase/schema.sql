@@ -22,6 +22,13 @@ END $$;
 
 DO $$
 BEGIN
+  CREATE TYPE public.booking_mode AS ENUM ('shift', 'full_day', 'range');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
   CREATE TYPE public.pool_status AS ENUM ('draft', 'pending_subscription', 'active', 'suspended');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
@@ -146,13 +153,19 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   guest_name TEXT NOT NULL,
   arrival_time TEXT NOT NULL DEFAULT '10:00',
   booking_date DATE NOT NULL,
+  booking_mode public.booking_mode NOT NULL DEFAULT 'full_day',
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  total_days INTEGER NOT NULL DEFAULT 1,
   shift_selected TEXT DEFAULT NULL,
   total_price NUMERIC(10,2) NOT NULL DEFAULT 0,
+  pricing_breakdown JSONB DEFAULT NULL,
   selected_upsells JSONB DEFAULT NULL,
   status public.booking_status NOT NULL DEFAULT 'negotiating',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Migration: add new columns to existing table
 ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS pool_id UUID REFERENCES public.pools(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS guest_name TEXT,
@@ -164,21 +177,30 @@ ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS status public.booking_status DEFAULT 'negotiating',
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
-UPDATE public.bookings
-SET arrival_time = '10:00'
-WHERE arrival_time IS NULL;
+-- New columns for booking model v2
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS booking_mode public.booking_mode DEFAULT 'full_day',
+  ADD COLUMN IF NOT EXISTS start_date DATE,
+  ADD COLUMN IF NOT EXISTS end_date DATE,
+  ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS pricing_breakdown JSONB DEFAULT NULL;
 
+-- Migrate existing data: populate start_date/end_date from booking_date
 UPDATE public.bookings
-SET total_price = 0
-WHERE total_price IS NULL;
+SET
+  start_date = booking_date,
+  end_date = booking_date,
+  total_days = 1,
+  booking_mode = CASE
+    WHEN shift_selected IS NOT NULL THEN 'shift'::public.booking_mode
+    ELSE 'full_day'::public.booking_mode
+  END
+WHERE start_date IS NULL;
 
-UPDATE public.bookings
-SET status = 'negotiating'
-WHERE status IS NULL;
-
-UPDATE public.bookings
-SET created_at = NOW()
-WHERE created_at IS NULL;
+UPDATE public.bookings SET arrival_time = '10:00' WHERE arrival_time IS NULL;
+UPDATE public.bookings SET total_price = 0 WHERE total_price IS NULL;
+UPDATE public.bookings SET status = 'negotiating' WHERE status IS NULL;
+UPDATE public.bookings SET created_at = NOW() WHERE created_at IS NULL;
 
 ALTER TABLE public.bookings
   ALTER COLUMN arrival_time SET DEFAULT '10:00',
@@ -186,13 +208,26 @@ ALTER TABLE public.bookings
   ALTER COLUMN status SET DEFAULT 'negotiating',
   ALTER COLUMN created_at SET DEFAULT NOW();
 
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_pool_date ON public.bookings(pool_id, booking_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_pool_range ON public.bookings(pool_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON public.bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON public.bookings(booking_date, status);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_booking
-  ON public.bookings(pool_id, booking_date)
-  WHERE status IN ('negotiating', 'confirmed');
+-- Drop the old unique index (too restrictive: blocks 2 shifts same day)
+DROP INDEX IF EXISTS idx_unique_active_booking;
+
+-- Shift bookings: same pool + same date + same shift = conflict
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_shift_booking
+  ON public.bookings(pool_id, start_date, shift_selected)
+  WHERE status IN ('negotiating', 'confirmed')
+    AND booking_mode = 'shift';
+
+-- Full-day bookings: same pool + same date = conflict
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_fullday_booking
+  ON public.bookings(pool_id, start_date)
+  WHERE status IN ('negotiating', 'confirmed')
+    AND booking_mode = 'full_day';
 
 -- ============================================================
 -- 6. TABLE: host_subscriptions
@@ -537,11 +572,14 @@ GRANT SELECT ON public.public_pools TO anon, authenticated;
 DROP VIEW IF EXISTS public.calendar_bookings;
 CREATE VIEW public.calendar_bookings AS
 SELECT
-  pool_id,
-  booking_date,
-  status::text AS status
-FROM public.bookings
-WHERE status IN ('negotiating', 'confirmed');
+  b.pool_id,
+  d::date AS booking_date,
+  b.shift_selected,
+  b.booking_mode::text AS booking_mode,
+  b.status::text AS status
+FROM public.bookings b,
+  generate_series(b.start_date, b.end_date, '1 day'::interval) AS d
+WHERE b.status IN ('negotiating', 'confirmed');
 
 GRANT SELECT ON public.calendar_bookings TO anon, authenticated;
 

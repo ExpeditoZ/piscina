@@ -4,13 +4,13 @@ import { useState, useCallback, useEffect } from "react";
 import {
   ArrowLeft,
   MapPin,
-  Clock,
   ShoppingBag,
   ScrollText,
   Waves,
   Flame,
   MessageCircle,
   ChevronRight,
+  CalendarRange,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ import { ImageCarousel } from "@/components/image-carousel";
 import { ShareButton } from "@/components/share-button";
 import { PoolCalendar } from "@/components/pool-calendar";
 import { CheckoutModal } from "@/components/checkout-modal";
-import type { PoolPublic } from "@/lib/types";
+import type { PoolPublic, BookingSelection } from "@/lib/types";
 
 interface PoolDetailClientProps {
   pool: PoolPublic;
@@ -27,8 +27,7 @@ interface PoolDetailClientProps {
 
 export function PoolDetailClient({ pool }: PoolDetailClientProps) {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedPrice, setSelectedPrice] = useState<number>(0);
+  const [selection, setSelection] = useState<BookingSelection | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const [viewerCount, setViewerCount] = useState(0);
@@ -45,8 +44,6 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const hasShifts =
-    pool.shifts_config?.enabled && pool.shifts_config.options.length > 0;
   const hasExtras = pool.upsell_extras && pool.upsell_extras.length > 0;
   const hasRules = !!pool.rules;
   const minPrice = Math.min(pool.pricing.weekday, pool.pricing.weekend);
@@ -56,22 +53,23 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
       ? window.location.href
       : `https://aluguesuapiscina.com/pool/${pool.id}`;
 
-  // Only select the date — no modal
-  const handleDateSelect = useCallback((date: Date, price: number) => {
-    setSelectedDate(date);
-    setSelectedPrice(price);
-  }, []);
+  const handleSelectionChange = useCallback(
+    (sel: BookingSelection | null) => {
+      setSelection(sel);
+    },
+    []
+  );
 
   // CTA opens checkout or scrolls to calendar
   const handleCTA = useCallback(() => {
-    if (!selectedDate) {
+    if (!selection) {
       document
         .getElementById("calendar")
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     setCheckoutOpen(true);
-  }, [selectedDate]);
+  }, [selection]);
 
   return (
     <>
@@ -151,41 +149,15 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             </div>
           </div>
 
-          {/* Calendar */}
+          {/* Calendar — now handles shifts internally */}
           <PoolCalendar
             poolId={pool.id}
             pricing={pool.pricing}
-            onDateSelect={handleDateSelect}
+            shiftsConfig={pool.shifts_config}
+            onSelectionChange={handleSelectionChange}
           />
 
-          {/* Shifts */}
-          {hasShifts && (
-            <div className="bg-white rounded-xl border border-slate-100">
-              <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <h2 className="font-bold text-[13px] text-slate-800">
-                  Turnos Disponíveis
-                </h2>
-              </div>
-              <div className="px-3 pb-3 space-y-1.5">
-                {pool.shifts_config!.options.map((shift, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
-                  >
-                    <span className="text-[13px] text-slate-700 font-medium">
-                      {shift.name}
-                    </span>
-                    <Badge className="font-bold text-emerald-700 bg-emerald-50 border-emerald-200 text-[11px]">
-                      R$ {shift.price}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Extras */}
+          {/* Extras (informational — selection happens in checkout) */}
           {hasExtras && (
             <div className="bg-white rounded-xl border border-slate-100">
               <div className="px-4 pt-3 pb-2 flex items-center gap-2">
@@ -203,9 +175,14 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
                     <span className="text-[13px] text-slate-600">
                       {extra.name}
                     </span>
-                    <Badge className="font-bold text-purple-700 bg-purple-50 border-purple-200 text-[11px]">
-                      + R$ {extra.price}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      {extra.billing === "per_day" && (
+                        <span className="text-[9px] text-slate-400 font-medium">/dia</span>
+                      )}
+                      <Badge className="font-bold text-purple-700 bg-purple-50 border-purple-200 text-[11px]">
+                        + R$ {extra.price}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -238,11 +215,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
         </div>
       </div>
 
-      {/* ===== STICKY BOTTOM CTA =====
-          OUTSIDE the scroll container.
-          fixed + bottom-0 + z-50.
-          pb-[72px] on the page body keeps content from hiding behind this.
-      */}
+      {/* ===== STICKY BOTTOM CTA ===== */}
       {!checkoutOpen && (
         <div
           className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200"
@@ -255,13 +228,19 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             {/* Price */}
             <div>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                {selectedDate ? "Selecionado" : "A partir de"}
+                {selection
+                  ? selection.mode === "range"
+                    ? `${selection.totalDays} dias`
+                    : "Selecionado"
+                  : "A partir de"}
               </p>
               <p className="text-lg font-extrabold text-slate-800 leading-tight">
-                R$ {selectedDate ? selectedPrice : minPrice}
-                <span className="text-[10px] font-normal text-slate-400 ml-0.5">
-                  /dia
-                </span>
+                R$ {selection ? selection.basePrice : minPrice}
+                {!selection && (
+                  <span className="text-[10px] font-normal text-slate-400 ml-0.5">
+                    /dia
+                  </span>
+                )}
               </p>
             </div>
 
@@ -269,15 +248,24 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
             <button
               onClick={handleCTA}
               className={`h-11 px-5 sm:px-6 rounded-xl font-bold text-[14px] flex items-center gap-1.5 transition-colors active:scale-[0.97] ${
-                selectedDate
+                selection
                   ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                   : "bg-sky-500 hover:bg-sky-600 text-white"
               }`}
             >
-              {selectedDate ? (
+              {selection ? (
                 <>
-                  Reservar
-                  <ChevronRight className="h-4 w-4" />
+                  {selection.mode === "range" ? (
+                    <>
+                      <CalendarRange className="h-4 w-4" />
+                      Reservar período
+                    </>
+                  ) : (
+                    <>
+                      Reservar
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
                 </>
               ) : (
                 "Escolher data"
@@ -290,8 +278,7 @@ export function PoolDetailClient({ pool }: PoolDetailClientProps) {
       {/* CHECKOUT MODAL */}
       <CheckoutModal
         pool={pool}
-        selectedDate={selectedDate}
-        basePrice={selectedPrice}
+        selection={selection}
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
       />

@@ -2,6 +2,10 @@
 // Database Types for AlugueSuaPiscina
 // ==============================
 
+// ---- Booking Modes ----
+export type BookingMode = "shift" | "full_day" | "range";
+
+// ---- Shift Config (per pool) ----
 export interface ShiftOption {
   name: string;
   price: number;
@@ -12,17 +16,49 @@ export interface ShiftsConfig {
   options: ShiftOption[];
 }
 
+// ---- Pricing ----
 export interface Pricing {
   weekday: number;
   weekend: number;
 }
 
+// ---- Pricing Breakdown (stored with each booking) ----
+export interface PricingDayLine {
+  date: string;
+  price: number;
+  type: "weekday" | "weekend";
+}
+
+export interface PricingExtraLine {
+  id: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  total: number;
+}
+
+export interface PricingBreakdown {
+  mode: BookingMode;
+  days: PricingDayLine[];
+  shiftName?: string;
+  shiftPrice?: number;
+  subtotalBase: number;
+  extras: PricingExtraLine[];
+  subtotalExtras: number;
+  total: number;
+}
+
+// ---- Extras ----
+export type ExtraBilling = "per_reservation" | "per_day";
+
 export interface UpsellExtra {
   id: string;
   name: string;
   price: number;
+  billing?: ExtraBilling; // default: "per_reservation"
 }
 
+// ---- Pool ----
 export type PoolStatus = "draft" | "pending_subscription" | "active" | "suspended";
 
 export interface Pool {
@@ -58,12 +94,16 @@ export interface PoolPublic {
   upsell_extras: UpsellExtra[] | null;
 }
 
+// ---- Booking ----
 export type BookingStatus = "negotiating" | "confirmed" | "cancelled";
 
 export interface SelectedUpsell {
   id: string;
   name: string;
   price: number;
+  billing?: ExtraBilling;
+  quantity?: number;
+  total?: number;
 }
 
 export interface Booking {
@@ -71,21 +111,38 @@ export interface Booking {
   pool_id: string;
   guest_name: string;
   arrival_time: string;
+  booking_mode: BookingMode;
   booking_date: string;
+  start_date: string;
+  end_date: string;
+  total_days: number;
   shift_selected: string | null;
   total_price: number;
+  pricing_breakdown: PricingBreakdown | null;
   selected_upsells: SelectedUpsell[] | null;
   status: BookingStatus;
   created_at: string;
 }
 
-// Minimal booking data exposed publicly (for calendar rendering)
+// ---- Calendar data (expanded view — one row per date) ----
 export interface BookingCalendar {
   booking_date: string;
+  shift_selected: string | null;
+  booking_mode: string;
   status: BookingStatus;
 }
 
-// Weather data from Open-Meteo
+// ---- Booking Selection (UI state between calendar → checkout) ----
+export interface BookingSelection {
+  mode: BookingMode;
+  startDate: Date;
+  endDate: Date;
+  totalDays: number;
+  shiftSelected: string | null;
+  basePrice: number;        // before extras
+}
+
+// ---- Weather ----
 export interface WeatherDay {
   date: string;
   weatherCode: number;

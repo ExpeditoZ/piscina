@@ -85,9 +85,9 @@ export async function GET() {
       rules:
         "Proibido garrafas de vidro. Máximo 15 pessoas. Som alto somente até 22h.",
       upsell_extras: [
-        { id: "1", name: "Saco de Gelo", price: 20 },
-        { id: "2", name: "Taxa de Limpeza", price: 80 },
-        { id: "3", name: "Área de Churrasqueira", price: 50 },
+        { id: "1", name: "Saco de Gelo", price: 20, billing: "per_day" },
+        { id: "2", name: "Taxa de Limpeza", price: 80, billing: "per_reservation" },
+        { id: "3", name: "Área de Churrasqueira", price: 50, billing: "per_day" },
       ],
       telegram_chat_id: null,
       status: "active" as const,
@@ -231,44 +231,109 @@ export async function GET() {
       .from("bookings")
       .delete()
       .eq("pool_id", poolId)
-      .in("guest_name", ["Ana Silva", "Carlos Souza"]);
+      .in("guest_name", ["Ana Silva", "Carlos Souza", "Maria Fernanda"]);
 
-    // Negotiating booking
+    // Test Booking 1: Shift booking (negotiating, morning)
     const { error: booking1Error } = await admin.from("bookings").insert({
       pool_id: poolId,
       guest_name: "Ana Silva",
       arrival_time: "09:00",
       booking_date: negotiatingDateStr,
+      booking_mode: "shift",
+      start_date: negotiatingDateStr,
+      end_date: negotiatingDateStr,
+      total_days: 1,
       shift_selected: "Manhã (8h-15h)",
       total_price: 270, // shift (250) + ice (20)
-      selected_upsells: [{ id: "1", name: "Saco de Gelo", price: 20 }],
+      pricing_breakdown: {
+        mode: "shift",
+        days: [{ date: negotiatingDateStr, price: 250, type: "weekday" }],
+        shiftName: "Manhã (8h-15h)",
+        shiftPrice: 250,
+        subtotalBase: 250,
+        extras: [{ id: "1", name: "Saco de Gelo", unitPrice: 20, quantity: 1, total: 20 }],
+        subtotalExtras: 20,
+        total: 270,
+      },
+      selected_upsells: [{ id: "1", name: "Saco de Gelo", price: 20, billing: "per_day", quantity: 1, total: 20 }],
       status: "negotiating",
     });
 
     if (booking1Error) {
       console.error("Booking 1 error:", booking1Error);
     } else {
-      console.log("✅ Created negotiating booking for", negotiatingDateStr);
+      console.log("✅ Created shift booking (negotiating) for", negotiatingDateStr);
     }
 
-    // Confirmed booking
+    // Test Booking 2: Full-day booking (confirmed)
     const { error: booking2Error } = await admin.from("bookings").insert({
       pool_id: poolId,
       guest_name: "Carlos Souza",
       arrival_time: "10:00",
       booking_date: confirmedDateStr,
+      booking_mode: "full_day",
+      start_date: confirmedDateStr,
+      end_date: confirmedDateStr,
+      total_days: 1,
       shift_selected: null,
       total_price: 580, // weekend (500) + cleaning (80)
-      selected_upsells: [
-        { id: "2", name: "Taxa de Limpeza", price: 80 },
-      ],
+      pricing_breakdown: {
+        mode: "full_day",
+        days: [{ date: confirmedDateStr, price: 500, type: "weekend" }],
+        subtotalBase: 500,
+        extras: [{ id: "2", name: "Taxa de Limpeza", unitPrice: 80, quantity: 1, total: 80 }],
+        subtotalExtras: 80,
+        total: 580,
+      },
+      selected_upsells: [{ id: "2", name: "Taxa de Limpeza", price: 80, billing: "per_reservation", quantity: 1, total: 80 }],
       status: "confirmed",
     });
 
     if (booking2Error) {
       console.error("Booking 2 error:", booking2Error);
     } else {
-      console.log("✅ Created confirmed booking for", confirmedDateStr);
+      console.log("✅ Created full_day booking (confirmed) for", confirmedDateStr);
+    }
+
+    // Test Booking 3: Range booking (negotiating, 3 days starting 7 days from now)
+    const rangeStartDate = new Date(now);
+    rangeStartDate.setDate(rangeStartDate.getDate() + 7);
+    const rangeEndDate = new Date(rangeStartDate);
+    rangeEndDate.setDate(rangeEndDate.getDate() + 2); // 3 days total
+    const rangeStartStr = rangeStartDate.toISOString().split("T")[0];
+    const rangeEndStr = rangeEndDate.toISOString().split("T")[0];
+
+    const { error: booking3Error } = await admin.from("bookings").insert({
+      pool_id: poolId,
+      guest_name: "Maria Fernanda",
+      arrival_time: "14:00",
+      booking_date: rangeStartStr,
+      booking_mode: "range",
+      start_date: rangeStartStr,
+      end_date: rangeEndStr,
+      total_days: 3,
+      shift_selected: null,
+      total_price: 1100,
+      pricing_breakdown: {
+        mode: "range",
+        days: [
+          { date: rangeStartStr, price: 300, type: "weekday" },
+          { date: new Date(rangeStartDate.getTime() + 86400000).toISOString().split("T")[0], price: 300, type: "weekday" },
+          { date: rangeEndStr, price: 500, type: "weekend" },
+        ],
+        subtotalBase: 1100,
+        extras: [],
+        subtotalExtras: 0,
+        total: 1100,
+      },
+      selected_upsells: null,
+      status: "negotiating",
+    });
+
+    if (booking3Error) {
+      console.error("Booking 3 error:", booking3Error);
+    } else {
+      console.log("✅ Created range booking (negotiating) for", rangeStartStr, "→", rangeEndStr);
     }
 
     // ========================================
@@ -294,13 +359,23 @@ export async function GET() {
           expiresAt: expiresAt.toISOString(),
         },
         bookings: {
-          negotiating: {
+          shift_negotiating: {
             guest: "Ana Silva",
+            mode: "shift",
             date: negotiatingDateStr,
+            shift: "Manhã (8h-15h)",
           },
-          confirmed: {
+          fullday_confirmed: {
             guest: "Carlos Souza",
+            mode: "full_day",
             date: confirmedDateStr,
+          },
+          range_negotiating: {
+            guest: "Maria Fernanda",
+            mode: "range",
+            startDate: rangeStartStr,
+            endDate: rangeEndStr,
+            totalDays: 3,
           },
         },
         routes: {

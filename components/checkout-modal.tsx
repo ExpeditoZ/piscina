@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { format, isWeekend } from "date-fns";
+import { format, isWeekend, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   MessageCircle,
@@ -12,6 +12,8 @@ import {
   Loader2,
   PartyPopper,
   X,
+  CalendarRange,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,20 +33,20 @@ import type {
   PoolPublic,
   ShiftOption,
   UpsellExtra,
+  BookingSelection,
+  BookingMode,
 } from "@/lib/types";
 
 interface CheckoutModalProps {
   pool: PoolPublic;
-  selectedDate: Date | null;
-  basePrice: number;
+  selection: BookingSelection | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function CheckoutModal({
   pool,
-  selectedDate,
-  basePrice,
+  selection,
   open,
   onOpenChange,
 }: CheckoutModalProps) {
@@ -54,7 +56,10 @@ export function CheckoutModal({
   const [guestName, setGuestName] = useState("");
   const [arrivalTime, setArrivalTime] = useState("10:00");
 
-  // Shift selection
+  // Booking mode choice (single-day only)
+  const [bookingChoice, setBookingChoice] = useState<"full_day" | "shift">(
+    "full_day"
+  );
   const [selectedShift, setSelectedShift] = useState<ShiftOption | null>(null);
 
   // Upsell selections
@@ -71,40 +76,83 @@ export function CheckoutModal({
   const hasExtras = pool.upsell_extras && pool.upsell_extras.length > 0;
   const hasRules = !!pool.rules;
 
-  // ----- LocalStorage memory: pre-fill guest name -----
+  const isSingleDay = selection?.mode !== "range";
+  const isRange = selection?.mode === "range";
+
+  // Pre-fill guest name from localStorage
   useEffect(() => {
     const savedName = localStorage.getItem("guestName");
-    if (savedName) {
-      setGuestName(savedName);
-    }
+    if (savedName) setGuestName(savedName);
   }, []);
 
-  // Reset shift/upsells when modal opens with new date
+  // Reset when modal opens
   useEffect(() => {
     if (open) {
       setSelectedShift(null);
+      setBookingChoice("full_day");
       setSelectedUpsells(new Set());
       setRulesAccepted(false);
     }
-  }, [open, selectedDate]);
+  }, [open]);
 
-  // ----- Calculate total price -----
-  const totalPrice = useMemo(() => {
-    let total = hasShifts && selectedShift ? selectedShift.price : basePrice;
+  // ---- Derived: effective booking mode ----
+  const effectiveMode: BookingMode = useMemo(() => {
+    if (isRange) return "range";
+    if (isSingleDay && hasShifts && bookingChoice === "shift" && selectedShift)
+      return "shift";
+    return "full_day";
+  }, [isRange, isSingleDay, hasShifts, bookingChoice, selectedShift]);
 
-    // Add upsells
-    if (hasExtras && pool.upsell_extras) {
-      pool.upsell_extras.forEach((extra) => {
-        if (selectedUpsells.has(extra.id)) {
-          total += extra.price;
-        }
+  // ---- Derived: base price ----
+  const basePrice = useMemo(() => {
+    if (!selection) return 0;
+    if (effectiveMode === "shift" && selectedShift) return selectedShift.price;
+    return selection.basePrice;
+  }, [selection, effectiveMode, selectedShift]);
+
+  // ---- Derived: total days ----
+  const totalDays = selection?.totalDays ?? 1;
+
+  // ---- Derived: per-day breakdown (for range) ----
+  const dayBreakdown = useMemo(() => {
+    if (!selection) return [];
+    const days = eachDayOfInterval({
+      start: selection.startDate,
+      end: selection.endDate,
+    });
+    return days.map((d) => ({
+      date: format(d, "yyyy-MM-dd"),
+      label: format(d, "EEE d/MM", { locale: ptBR }),
+      isWeekend: isWeekend(d),
+      price: isWeekend(d) ? pool.pricing.weekend : pool.pricing.weekday,
+    }));
+  }, [selection, pool.pricing]);
+
+  // ---- Extras calculation ----
+  const extrasBreakdown = useMemo(() => {
+    if (!hasExtras || !pool.upsell_extras) return [];
+    return pool.upsell_extras
+      .filter((e) => selectedUpsells.has(e.id))
+      .map((e) => {
+        const billing = e.billing ?? "per_reservation";
+        const quantity = billing === "per_day" ? totalDays : 1;
+        return {
+          id: e.id,
+          name: e.name,
+          unitPrice: e.price,
+          billing,
+          quantity,
+          total: e.price * quantity,
+        };
       });
-    }
+  }, [selectedUpsells, hasExtras, pool.upsell_extras, totalDays]);
 
-    return total;
-  }, [basePrice, selectedShift, selectedUpsells, hasShifts, hasExtras, pool.upsell_extras]);
+  const extrasTotal = extrasBreakdown.reduce((s, e) => s + e.total, 0);
 
-  // ----- Upsell toggle -----
+  // ---- Total price ----
+  const totalPrice = basePrice + extrasTotal;
+
+  // ---- Upsell toggle ----
   function toggleUpsell(id: string) {
     setSelectedUpsells((prev) => {
       const next = new Set(prev);
@@ -114,45 +162,58 @@ export function CheckoutModal({
     });
   }
 
-  // ----- Validation -----
+  // ---- Validation ----
   const canSubmit = useMemo(() => {
     if (!guestName.trim()) return false;
     if (!arrivalTime.trim()) return false;
     if (hasRules && !rulesAccepted) return false;
+    // Single day with shifts: must choose shift OR full day
+    if (isSingleDay && hasShifts && bookingChoice === "shift" && !selectedShift)
+      return false;
     return true;
-  }, [guestName, arrivalTime, hasRules, rulesAccepted]);
+  }, [
+    guestName,
+    arrivalTime,
+    hasRules,
+    rulesAccepted,
+    isSingleDay,
+    hasShifts,
+    bookingChoice,
+    selectedShift,
+  ]);
 
-  // ----- Submit: Create booking via server API (price recalculated server-side) -----
+  // ---- Submit ----
   async function handleSubmit() {
-    if (!canSubmit || !selectedDate || isSubmitting) return;
+    if (!canSubmit || !selection || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const formattedDate = format(selectedDate, "dd/MM/yyyy (EEEE)", {
+      const startStr = format(selection.startDate, "yyyy-MM-dd");
+      const endStr = format(selection.endDate, "yyyy-MM-dd");
+      const formattedStart = format(selection.startDate, "dd/MM/yyyy (EEEE)", {
         locale: ptBR,
       });
 
-      // 1. Save guest name to localStorage
       localStorage.setItem("guestName", guestName.trim());
 
-      // 2. Build WhatsApp message text (phone number stays server-side)
-      const upsellNames = hasExtras
-        ? pool
-            .upsell_extras!.filter((e) => selectedUpsells.has(e.id))
-            .map((e) => e.name)
-            .join(", ")
-        : "";
-
-      const shiftText = selectedShift
-        ? `Turno: ${selectedShift.name}`
-        : "Dia inteiro";
+      // Build WhatsApp message
+      const upsellNames = extrasBreakdown.map((e) => e.name).join(", ");
+      const shiftText =
+        effectiveMode === "shift" && selectedShift
+          ? `Turno: ${selectedShift.name}`
+          : effectiveMode === "range"
+          ? `Período: ${formattedStart} → ${format(selection.endDate, "dd/MM/yyyy (EEEE)", { locale: ptBR })} (${totalDays} dias)`
+          : "Dia inteiro";
       const extrasText = upsellNames ? `Extras: ${upsellNames}` : "";
       const rulesText = hasRules ? "Li e concordo com as regras." : "";
 
       const whatsappMessage = [
-        `Olá! Quero alugar *${pool.title}* no dia *${formattedDate}*`,
+        `Olá! Quero alugar *${pool.title}*${
+          effectiveMode === "range"
+            ? ` de *${formattedStart}* a *${format(selection.endDate, "dd/MM/yyyy")}* (${totalDays} dias)`
+            : ` no dia *${formattedStart}*`
+        }`,
         shiftText,
         extrasText,
         rulesText,
@@ -163,7 +224,7 @@ export function CheckoutModal({
         .filter(Boolean)
         .join(". ");
 
-      // 3. Call unified booking API (price is recalculated server-side)
+      // Call booking API
       const res = await fetch("/api/create-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,11 +232,11 @@ export function CheckoutModal({
           poolId: pool.id,
           guestName: guestName.trim(),
           arrivalTime,
-          bookingDate: dateStr,
+          bookingMode: effectiveMode,
+          startDate: startStr,
+          endDate: endStr,
           shiftSelected: selectedShift?.name ?? null,
-          selectedUpsellIds: hasExtras
-            ? Array.from(selectedUpsells)
-            : [],
+          selectedUpsellIds: hasExtras ? Array.from(selectedUpsells) : [],
           whatsappMessage,
         }),
       });
@@ -188,7 +249,6 @@ export function CheckoutModal({
         return;
       }
 
-      // 4. Show success toast + redirect to WhatsApp
       toast.success("Reserva registrada! Redirecionando para o WhatsApp...", {
         icon: <PartyPopper className="h-4 w-4" />,
       });
@@ -211,12 +271,10 @@ export function CheckoutModal({
     }
   }
 
-  if (!selectedDate) return null;
+  if (!selection) return null;
 
   const savedName =
-    typeof window !== "undefined"
-      ? localStorage.getItem("guestName")
-      : null;
+    typeof window !== "undefined" ? localStorage.getItem("guestName") : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -243,51 +301,99 @@ export function CheckoutModal({
             Reservar {pool.title}
           </SheetTitle>
           <SheetDescription className="flex items-center gap-2 text-sm">
-            📅{" "}
-            {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-            {isWeekend(selectedDate) && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">
-                FDS
+            {isRange ? (
+              <span className="flex items-center gap-1.5">
+                <CalendarRange className="h-4 w-4 text-sky-500" />
+                {format(selection.startDate, "d MMM", { locale: ptBR })} →{" "}
+                {format(selection.endDate, "d MMM", { locale: ptBR })}
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700">
+                  {totalDays} dias
+                </span>
+              </span>
+            ) : (
+              <span className="capitalize">
+                📅 {format(selection.startDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
               </span>
             )}
           </SheetDescription>
         </SheetHeader>
 
         <div className="px-5 py-4 space-y-5">
-          {/* ===== Step 1: Shift Selection (Conditional) ===== */}
-          {hasShifts && (
+          {/* ===== Step 1: Booking Type (single-day with shifts) ===== */}
+          {isSingleDay && hasShifts && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-500" />
                 <h3 className="font-semibold text-sm text-slate-800">
-                  Escolha o turno
+                  Tipo de reserva
                 </h3>
               </div>
               <RadioGroup
-                value={selectedShift?.name ?? ""}
-                onValueChange={(name) => {
-                  const shift = pool.shifts_config!.options.find(
-                    (s) => s.name === name
-                  );
-                  setSelectedShift(shift ?? null);
+                value={
+                  bookingChoice === "full_day"
+                    ? "__full_day__"
+                    : selectedShift?.name ?? ""
+                }
+                onValueChange={(val) => {
+                  if (val === "__full_day__") {
+                    setBookingChoice("full_day");
+                    setSelectedShift(null);
+                  } else {
+                    setBookingChoice("shift");
+                    const shift = pool.shifts_config!.options.find(
+                      (s) => s.name === val
+                    );
+                    setSelectedShift(shift ?? null);
+                  }
                 }}
               >
+                {/* Full day option */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    bookingChoice === "full_day"
+                      ? "border-sky-400 bg-sky-50"
+                      : "border-slate-100 hover:border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value="__full_day__" />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700">
+                        Dia Inteiro
+                      </span>
+                      <p className="text-[10px] text-slate-400">
+                        Acesso o dia todo
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-emerald-600">
+                    R${" "}
+                    {isWeekend(selection.startDate)
+                      ? pool.pricing.weekend
+                      : pool.pricing.weekday}
+                  </span>
+                </label>
+
+                {/* Shift options */}
                 {pool.shifts_config!.options.map((shift) => (
                   <label
                     key={shift.name}
                     className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      bookingChoice === "shift" &&
                       selectedShift?.name === shift.name
-                        ? "border-sky-400 bg-sky-50"
+                        ? "border-amber-400 bg-amber-50"
                         : "border-slate-100 hover:border-slate-200 bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <RadioGroupItem value={shift.name} />
-                      <span className="text-sm font-medium text-slate-700">
-                        {shift.name}
-                      </span>
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">
+                          {shift.name}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-sm font-bold text-emerald-600">
+                    <span className="text-sm font-bold text-amber-600">
                       R$ {shift.price}
                     </span>
                   </label>
@@ -297,7 +403,40 @@ export function CheckoutModal({
             </div>
           )}
 
-          {/* ===== Step 2: Upsell Cart (Conditional) ===== */}
+          {/* ===== Range breakdown (range mode) ===== */}
+          {isRange && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="h-4 w-4 text-sky-500" />
+                <h3 className="font-semibold text-sm text-slate-800">
+                  Detalhes do período
+                </h3>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                {dayBreakdown.map((day) => (
+                  <div
+                    key={day.date}
+                    className="flex justify-between text-[12px]"
+                  >
+                    <span className="text-slate-500 capitalize">
+                      {day.label}
+                      {day.isWeekend && (
+                        <span className="text-orange-500 ml-1 font-medium">
+                          FDS
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-slate-700 font-medium">
+                      R$ {day.price}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Separator />
+            </div>
+          )}
+
+          {/* ===== Step 2: Extras ===== */}
           {hasExtras && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -307,29 +446,42 @@ export function CheckoutModal({
                 </h3>
               </div>
               <div className="space-y-2">
-                {pool.upsell_extras!.map((extra: UpsellExtra) => (
-                  <label
-                    key={extra.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedUpsells.has(extra.id)
-                        ? "border-purple-300 bg-purple-50"
-                        : "border-slate-100 hover:border-slate-200 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={selectedUpsells.has(extra.id)}
-                        onCheckedChange={() => toggleUpsell(extra.id)}
-                      />
-                      <span className="text-sm text-slate-700">
-                        {extra.name}
+                {pool.upsell_extras!.map((extra: UpsellExtra) => {
+                  const billing = extra.billing ?? "per_reservation";
+                  const qty = billing === "per_day" ? totalDays : 1;
+                  const lineTotal = extra.price * qty;
+
+                  return (
+                    <label
+                      key={extra.id}
+                      className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        selectedUpsells.has(extra.id)
+                          ? "border-purple-300 bg-purple-50"
+                          : "border-slate-100 hover:border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={selectedUpsells.has(extra.id)}
+                          onCheckedChange={() => toggleUpsell(extra.id)}
+                        />
+                        <div>
+                          <span className="text-sm text-slate-700">
+                            {extra.name}
+                          </span>
+                          {billing === "per_day" && totalDays > 1 && (
+                            <p className="text-[10px] text-slate-400">
+                              R$ {extra.price} × {qty} dias
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold text-purple-600">
+                        + R$ {lineTotal}
                       </span>
-                    </div>
-                    <span className="text-sm font-bold text-purple-600">
-                      + R$ {extra.price}
-                    </span>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
               </div>
               <Separator />
             </div>
@@ -348,13 +500,9 @@ export function CheckoutModal({
                 </span>
               )}
             </div>
-
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="guest-name"
-                  className="text-xs text-slate-600"
-                >
+                <Label htmlFor="guest-name" className="text-xs text-slate-600">
                   Seu nome *
                 </Label>
                 <Input
@@ -365,7 +513,6 @@ export function CheckoutModal({
                   className="h-10 bg-slate-50/50"
                 />
               </div>
-
               <div className="space-y-1.5">
                 <Label
                   htmlFor="arrival-time"
@@ -384,7 +531,7 @@ export function CheckoutModal({
             </div>
           </div>
 
-          {/* ===== Step 4: Rules Agreement (Conditional) ===== */}
+          {/* ===== Step 4: Rules ===== */}
           {hasRules && (
             <>
               <Separator />
@@ -395,13 +542,11 @@ export function CheckoutModal({
                     Regras da piscina
                   </h3>
                 </div>
-
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                   <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
                     {pool.rules}
                   </p>
                 </div>
-
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox
                     checked={rulesAccepted}
@@ -425,35 +570,77 @@ export function CheckoutModal({
           <div className="p-4 rounded-xl bg-gradient-to-r from-sky-50 to-cyan-50 border border-sky-100">
             <div className="space-y-1.5">
               {/* Base price */}
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>
-                  {hasShifts && selectedShift
-                    ? selectedShift.name
-                    : isWeekend(selectedDate)
-                      ? "Diária (fim de semana)"
-                      : "Diária (dia de semana)"}
-                </span>
-                <span>
-                  R${" "}
-                  {hasShifts && selectedShift
-                    ? selectedShift.price
-                    : basePrice}
-                </span>
-              </div>
+              {effectiveMode === "shift" && selectedShift ? (
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>{selectedShift.name}</span>
+                  <span>R$ {selectedShift.price}</span>
+                </div>
+              ) : effectiveMode === "range" ? (
+                <>
+                  {(() => {
+                    const weekdays = dayBreakdown.filter((d) => !d.isWeekend);
+                    const weekends = dayBreakdown.filter((d) => d.isWeekend);
+                    return (
+                      <>
+                        {weekdays.length > 0 && (
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>
+                              {weekdays.length} dia{weekdays.length > 1 ? "s" : ""} de semana × R${" "}
+                              {pool.pricing.weekday}
+                            </span>
+                            <span>
+                              R${" "}
+                              {weekdays.reduce((s, d) => s + d.price, 0)}
+                            </span>
+                          </div>
+                        )}
+                        {weekends.length > 0 && (
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>
+                              {weekends.length} dia{weekends.length > 1 ? "s" : ""} de FDS × R${" "}
+                              {pool.pricing.weekend}
+                            </span>
+                            <span>
+                              R${" "}
+                              {weekends.reduce((s, d) => s + d.price, 0)}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>
+                    Diária (
+                    {isWeekend(selection.startDate)
+                      ? "fim de semana"
+                      : "dia de semana"}
+                    )
+                  </span>
+                  <span>R$ {basePrice}</span>
+                </div>
+              )}
 
-              {/* Upsells breakdown */}
-              {hasExtras &&
-                pool.upsell_extras!
-                  .filter((e) => selectedUpsells.has(e.id))
-                  .map((e) => (
-                    <div
-                      key={e.id}
-                      className="flex justify-between text-xs text-slate-500"
-                    >
-                      <span>{e.name}</span>
-                      <span>+ R$ {e.price}</span>
-                    </div>
-                  ))}
+              {/* Extras breakdown */}
+              {extrasBreakdown.map((e) => (
+                <div
+                  key={e.id}
+                  className="flex justify-between text-xs text-slate-500"
+                >
+                  <span>
+                    {e.name}
+                    {e.quantity > 1 && (
+                      <span className="text-slate-400">
+                        {" "}
+                        ({e.quantity}×)
+                      </span>
+                    )}
+                  </span>
+                  <span>+ R$ {e.total}</span>
+                </div>
+              ))}
 
               <Separator className="my-2" />
 
@@ -467,7 +654,7 @@ export function CheckoutModal({
             </div>
           </div>
 
-          {/* ===== Step 5: WhatsApp CTA ===== */}
+          {/* ===== Submit ===== */}
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit || isSubmitting}
@@ -495,9 +682,14 @@ export function CheckoutModal({
             <p className="text-[10px] text-center text-slate-400">
               {!guestName.trim()
                 ? "Preencha seu nome para continuar"
+                : isSingleDay &&
+                  hasShifts &&
+                  bookingChoice === "shift" &&
+                  !selectedShift
+                ? "Escolha um turno para continuar"
                 : hasRules && !rulesAccepted
-                  ? "Aceite as regras para continuar"
-                  : "Preencha todos os campos obrigatórios"}
+                ? "Aceite as regras para continuar"
+                : "Preencha todos os campos obrigatórios"}
             </p>
           )}
         </div>
