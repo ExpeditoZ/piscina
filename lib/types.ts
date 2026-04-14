@@ -90,4 +90,5 @@ export interface WeatherDay {
   date: string;
   weatherCode: number;
   temperatureMax: number;
+  temperatureMin: number;
 }

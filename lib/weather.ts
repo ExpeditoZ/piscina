@@ -13,7 +13,7 @@ export async function fetchWeather(
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", String(latitude));
     url.searchParams.set("longitude", String(longitude));
-    url.searchParams.set("daily", "weather_code,temperature_2m_max");
+    url.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min");
     url.searchParams.set("timezone", "America/Sao_Paulo");
     url.searchParams.set("forecast_days", "14");
 
@@ -30,6 +30,7 @@ export async function fetchWeather(
         date,
         weatherCode: data.daily.weather_code[i],
         temperatureMax: Math.round(data.daily.temperature_2m_max[i]),
+        temperatureMin: Math.round(data.daily.temperature_2m_min?.[i] ?? 0),
       })
     );
 
@@ -55,6 +56,26 @@ export function getWeatherIcon(code: number): string {
   if (code <= 94) return "🌨️";              // Snow showers
   if (code <= 99) return "⛈️";              // Thunderstorm
   return "🌤️";
+}
+
+/**
+ * Get Portuguese weather description from WMO code.
+ */
+export function getWeatherLabel(code: number): string {
+  if (code === 0) return "Ensolarado";
+  if (code <= 2) return "Parcialmente nublado";
+  if (code === 3) return "Nublado";
+  if (code <= 49) return "Nublado com névoa";
+  if (code <= 55) return "Garoa leve";
+  if (code <= 59) return "Garoa";
+  if (code <= 63) return "Chuva leve";
+  if (code <= 69) return "Chuva";
+  if (code <= 79) return "Neve";
+  if (code <= 82) return "Pancadas de chuva";
+  if (code <= 84) return "Chuva forte";
+  if (code <= 94) return "Neve forte";
+  if (code <= 99) return "Tempestade";
+  return "Parcialmente nublado";
 }
 
 /**
