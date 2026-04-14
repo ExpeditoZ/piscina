@@ -26,8 +26,14 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
     [totalSlides]
   );
 
-  const goPrev = useCallback(() => goTo(currentIndex - 1), [currentIndex, goTo]);
-  const goNext = useCallback(() => goTo(currentIndex + 1), [currentIndex, goTo]);
+  const goPrev = useCallback(
+    () => goTo(currentIndex - 1),
+    [currentIndex, goTo]
+  );
+  const goNext = useCallback(
+    () => goTo(currentIndex + 1),
+    [currentIndex, goTo]
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -85,7 +91,7 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
 
   if (!images || images.length === 0) {
     return (
-      <div className="relative aspect-[16/10] sm:aspect-[16/9] bg-gradient-to-br from-sky-100 to-cyan-50 rounded-2xl overflow-hidden flex items-center justify-center">
+      <div className="relative aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-sky-100 to-cyan-50 sm:rounded-2xl overflow-hidden flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-3">🏊‍♂️</div>
           <p className="text-sm text-sky-400">Sem fotos disponíveis</p>
@@ -97,7 +103,7 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
   return (
     <div
       ref={containerRef}
-      className="relative aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-slate-900 select-none group"
+      className="relative aspect-[4/3] sm:aspect-[16/9] sm:rounded-2xl overflow-hidden bg-slate-900 select-none group"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -134,7 +140,7 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
               e.stopPropagation();
               goPrev();
             }}
-            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white hover:scale-110"
+            className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/90 backdrop-blur-sm shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white hover:scale-110 active:scale-95"
             aria-label="Foto anterior"
           >
             <ChevronLeft className="h-4 w-4 text-slate-700" />
@@ -144,7 +150,7 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
               e.stopPropagation();
               goNext();
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white hover:scale-110"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/90 backdrop-blur-sm shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white hover:scale-110 active:scale-95"
             aria-label="Próxima foto"
           >
             <ChevronRight className="h-4 w-4 text-slate-700" />
@@ -154,7 +160,7 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
 
       {/* Dot indicators */}
       {totalSlides > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm">
           {images.map((_, index) => (
             <button
               key={index}
@@ -164,8 +170,8 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
               }}
               className={`rounded-full transition-all duration-200 ${
                 index === currentIndex
-                  ? "w-6 h-2 bg-white shadow-md"
-                  : "w-2 h-2 bg-white/50 hover:bg-white/80"
+                  ? "w-5 h-1.5 bg-white"
+                  : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
               }`}
               aria-label={`Ir para foto ${index + 1}`}
             />
@@ -173,10 +179,10 @@ export function ImageCarousel({ images, title }: ImageCarouselProps) {
         </div>
       )}
 
-      {/* Counter */}
+      {/* Counter pill */}
       {totalSlides > 1 && (
-        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-medium">
-          {currentIndex + 1}/{totalSlides}
+        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white text-[11px] font-semibold tabular-nums">
+          {currentIndex + 1} / {totalSlides}
         </span>
       )}
     </div>
