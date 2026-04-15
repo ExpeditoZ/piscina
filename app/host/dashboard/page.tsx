@@ -374,24 +374,27 @@ export default async function HostDashboard() {
                         <div className="flex items-start gap-2">
                           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">1</span>
                           <p className="text-xs text-slate-600">
-                            Abra o Telegram e procure por <code className="bg-white px-1 py-0.5 rounded text-blue-600 font-semibold">@BotFather</code>
+                            Abra o Telegram e busque{" "}
+                            <a href="https://t.me/AlugueSuaPiscinaBot" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 underline">
+                              @AlugueSuaPiscinaBot
+                            </a>
                           </p>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
                           <p className="text-xs text-slate-600">
-                            Inicie uma conversa com o bot da plataforma (link será fornecido)
+                            Envie <code className="bg-white px-1 py-0.5 rounded text-blue-600 font-semibold">/start</code> — o bot retornará seu Chat ID
                           </p>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-700 text-[10px] font-bold flex items-center justify-center">3</span>
                           <p className="text-xs text-slate-600">
-                            Copie o Chat ID e cole no campo &quot;Telegram Chat ID&quot; no formulário abaixo
+                            Copie o número e cole no campo &quot;Telegram Chat ID&quot; no formulário abaixo
                           </p>
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-400">
-                        Dica: Cada reserva pode ser confirmada ou rejeitada diretamente pelo Telegram.
+                        Pronto! Cada reserva poderá ser confirmada ou rejeitada diretamente pelo Telegram.
                       </p>
                     </div>
                   </div>

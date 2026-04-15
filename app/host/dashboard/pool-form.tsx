@@ -522,12 +522,32 @@ export function PoolForm({ pool }: PoolFormProps) {
               className="h-10 bg-slate-50/50"
             />
           </div>
-          <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-            <p className="text-xs text-blue-700 leading-relaxed">
-              <strong>Como obter seu Chat ID:</strong> Abra o Telegram, busque nosso Bot,
-              envie <code className="bg-blue-100 px-1 py-0.5 rounded text-blue-800">/start</code>{" "}
-              e o bot irá retornar seu Chat ID. Cole-o aqui para receber
-              notificações de reservas.
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 space-y-2">
+            <p className="text-xs font-semibold text-blue-800">
+              Como configurar:
+            </p>
+            <ol className="text-xs text-blue-700 leading-relaxed space-y-1 list-decimal list-inside">
+              <li>
+                Abra o Telegram e busque{" "}
+                <a
+                  href="https://t.me/AlugueSuaPiscinaBot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-blue-800 underline"
+                >
+                  @AlugueSuaPiscinaBot
+                </a>
+              </li>
+              <li>
+                Envie{" "}
+                <code className="bg-blue-100 px-1 py-0.5 rounded text-blue-800">/start</code>{" "}
+                para o bot
+              </li>
+              <li>O bot irá retornar seu Chat ID (um número)</li>
+              <li>Cole o número no campo acima e salve</li>
+            </ol>
+            <p className="text-[10px] text-blue-600 mt-1">
+              Após configurar, você receberá notificações de reservas com botões para confirmar ou rejeitar.
             </p>
           </div>
         </CardContent>

@@ -5,10 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Receives callback_query events when pool owners tap
  * inline keyboard buttons (Confirm / Reject).
  *
- * Callback data format: "confirm_{poolId}_{bookingDate}" or "reject_{poolId}_{bookingDate}"
+ * Callback data format: "confirm_{bookingId}" or "reject_{bookingId}"
+ *
+ * Also handles /start messages to return the user's Chat ID.
  *
  * SECURITY: Verifies X-Telegram-Bot-Api-Secret-Token header.
- * When registering the webhook, pass ?secret_token=YOUR_SECRET to Telegram's setWebhook API.
+ * When registering the webhook, pass secret_token to Telegram's setWebhook API.
  */
 export async function POST(request: Request) {
   try {
@@ -19,12 +21,12 @@ export async function POST(request: Request) {
         "x-telegram-bot-api-secret-token"
       );
       if (headerSecret !== telegramSecret) {
+        console.warn("Telegram webhook: invalid secret token");
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
     }
 
     const body = await request.json();
-
 
     // Handle callback_query from inline keyboard
     const callbackQuery = body.callback_query;
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
         if (botToken) {
-          await fetch(
+          const response = await fetch(
             `https://api.telegram.org/bot${botToken}/sendMessage`,
             {
               method: "POST",
@@ -43,18 +45,30 @@ export async function POST(request: Request) {
               body: JSON.stringify({
                 chat_id: chatId,
                 text:
-                  `👋 Olá! Seu Chat ID é:\n\n` +
+                  `👋 Olá! Bem-vindo ao *AlugueSuaPiscina*!\n\n` +
+                  `Seu Chat ID é:\n\n` +
                   `\`${chatId}\`\n\n` +
-                  `Copie este número e cole no painel de configuração da sua piscina em AlugueSuaPiscina.`,
+                  `📋 *Como usar:*\n` +
+                  `1. Copie o número acima\n` +
+                  `2. Acesse seu painel em AlugueSuaPiscina\n` +
+                  `3. Cole no campo "Telegram Chat ID"\n` +
+                  `4. Salve as configurações\n\n` +
+                  `✅ Pronto! Você receberá notificações de reservas aqui.`,
                 parse_mode: "Markdown",
               }),
             }
           );
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error("Telegram /start send error:", response.status, errText);
+          }
         }
 
         return Response.json({ ok: true });
       }
 
+      // Unknown message type — just acknowledge
       return Response.json({ ok: true });
     }
 
@@ -68,18 +82,17 @@ export async function POST(request: Request) {
     }
 
     // Parse callback data
-    // Format: "confirm_{poolId}_{startDate}" or "confirm_{poolId}_{startDate}_{endDate}"
-    const parts = data.split("_");
-    const action = parts[0]; // "confirm" or "reject"
-    const poolId = parts[1];
-    // Dates: could be "2026-04-20" or "2026-04-20_2026-04-23"
-    const datesPart = parts.slice(2).join("_");
-    const dateParts = datesPart.split("_");
-    const startDate = dateParts[0]; // e.g. "2026-04-20"
-    const endDate = dateParts.length > 1 ? dateParts[1] : startDate;
-    const isRangeBooking = startDate !== endDate;
+    // Format: "confirm_{bookingId}" or "reject_{bookingId}"
+    const underscoreIndex = data.indexOf("_");
+    if (underscoreIndex === -1) {
+      await answerCallback(botToken, callbackQuery.id, "❌ Dados inválidos");
+      return Response.json({ ok: true });
+    }
 
-    if (!action || !poolId || !startDate) {
+    const action = data.substring(0, underscoreIndex); // "confirm" or "reject"
+    const bookingId = data.substring(underscoreIndex + 1); // UUID
+
+    if (!action || !bookingId || (action !== "confirm" && action !== "reject")) {
       await answerCallback(botToken, callbackQuery.id, "❌ Dados inválidos");
       return Response.json({ ok: true });
     }
@@ -87,34 +100,48 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
 
     if (action === "confirm") {
-      // Update booking status to confirmed
-      const { data: bookings, error: updateError } = await supabase
+      // Fetch booking details first
+      const { data: booking, error: fetchError } = await supabase
         .from("bookings")
-        .update({ status: "confirmed" })
-        .eq("pool_id", poolId)
-        .eq("start_date", startDate)
-        .eq("end_date", endDate)
-        .eq("status", "negotiating")
-        .select("guest_name, arrival_time, booking_mode, total_days")
-        .limit(1);
+        .select("id, pool_id, guest_name, arrival_time, booking_mode, total_days, start_date, end_date, status")
+        .eq("id", bookingId)
+        .single();
 
-      if (updateError) {
-        console.error("Error confirming booking:", updateError);
+      if (fetchError || !booking) {
+        console.error("Booking not found:", bookingId, fetchError);
+        await answerCallback(botToken, callbackQuery.id, "❌ Reserva não encontrada");
+        return Response.json({ ok: true });
+      }
+
+      if (booking.status !== "negotiating") {
         await answerCallback(
           botToken,
           callbackQuery.id,
-          "❌ Erro ao confirmar"
+          booking.status === "confirmed"
+            ? "ℹ️ Esta reserva já foi confirmada"
+            : "ℹ️ Esta reserva já foi cancelada"
         );
         return Response.json({ ok: true });
       }
 
-      const booking = bookings?.[0];
+      // Update booking status to confirmed
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({ status: "confirmed" })
+        .eq("id", bookingId)
+        .eq("status", "negotiating");
+
+      if (updateError) {
+        console.error("Error confirming booking:", updateError);
+        await answerCallback(botToken, callbackQuery.id, "❌ Erro ao confirmar");
+        return Response.json({ ok: true });
+      }
 
       // Fetch pool private info to share with owner
       const { data: pool } = await supabase
         .from("pools")
         .select("exact_address, key_lockbox_instructions")
-        .eq("id", poolId)
+        .eq("id", booking.pool_id)
         .single();
 
       // Answer callback
@@ -125,45 +152,63 @@ export async function POST(request: Request) {
       );
 
       // Update the original message to remove buttons
-      const dateLabel = isRangeBooking
-        ? `${startDate} → ${endDate} (${booking?.total_days ?? "?"} dias)`
-        : startDate;
+      const isRange = booking.start_date !== booking.end_date;
+      const dateLabel = isRange
+        ? `${booking.start_date} → ${booking.end_date} (${booking.total_days ?? "?"} dias)`
+        : booking.start_date;
 
       const confirmMsg =
         `✅ *Reserva Confirmada!*\n\n` +
-        `📅 ${isRangeBooking ? "Período" : "Data"}: *${dateLabel}*\n\n` +
-        (booking
-          ? `👤 Hóspede: *${booking.guest_name}*\n` +
-            `⏰ Chegada: *${booking.arrival_time}*\n\n`
-          : "") +
+        `📅 ${isRange ? "Período" : "Data"}: *${dateLabel}*\n` +
+        `👤 Hóspede: *${booking.guest_name}*\n` +
+        `⏰ Chegada: *${booking.arrival_time}*\n\n` +
         `📋 *Copie e encaminhe ao hóspede no WhatsApp:*\n\n` +
         `Endereço: ${pool?.exact_address ?? "Não informado"}\n` +
         `Instruções: ${pool?.key_lockbox_instructions ?? "Não informado"}`;
 
       await editMessage(botToken, chatId, messageId, confirmMsg);
-    } else if (action === "reject") {
-      // Update booking status to cancelled (frees the date)
-      const { error: updateError } = await supabase
-        .from("bookings")
-        .update({ status: "cancelled" })
-        .eq("pool_id", poolId)
-        .eq("start_date", startDate)
-        .eq("end_date", endDate)
-        .eq("status", "negotiating");
 
-      if (updateError) {
-        console.error("Error rejecting booking:", updateError);
+    } else if (action === "reject") {
+      // Fetch booking to check status
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("id, start_date, end_date, status")
+        .eq("id", bookingId)
+        .single();
+
+      if (!booking) {
+        await answerCallback(botToken, callbackQuery.id, "❌ Reserva não encontrada");
+        return Response.json({ ok: true });
+      }
+
+      if (booking.status !== "negotiating") {
         await answerCallback(
           botToken,
           callbackQuery.id,
-          "❌ Erro ao rejeitar"
+          booking.status === "confirmed"
+            ? "ℹ️ Esta reserva já foi confirmada — cancele manualmente"
+            : "ℹ️ Esta reserva já foi cancelada"
         );
         return Response.json({ ok: true });
       }
 
-      const dateLabel = isRangeBooking
-        ? `${startDate} → ${endDate}`
-        : startDate;
+      // Update booking status to cancelled
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", bookingId)
+        .eq("status", "negotiating");
+
+      if (updateError) {
+        console.error("Error rejecting booking:", updateError);
+        await answerCallback(botToken, callbackQuery.id, "❌ Erro ao rejeitar");
+        return Response.json({ ok: true });
+      }
+
+      const isRange = booking.start_date !== booking.end_date;
+      const dateLabel = isRange
+        ? `${booking.start_date} → ${booking.end_date}`
+        : booking.start_date;
 
       // Answer callback
       await answerCallback(
@@ -177,7 +222,7 @@ export async function POST(request: Request) {
         botToken,
         chatId,
         messageId,
-        `❌ *Reserva Rejeitada*\n\nA ${isRangeBooking ? "período" : "data"} *${dateLabel}* foi liberada.`
+        `❌ *Reserva Rejeitada*\n\nA ${isRange ? "período" : "data"} *${dateLabel}* foi liberada.`
       );
     }
 
@@ -194,18 +239,25 @@ async function answerCallback(
   callbackQueryId: string,
   text: string
 ) {
-  await fetch(
-    `https://api.telegram.org/bot${botToken}/answerCallbackQuery`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        callback_query_id: callbackQueryId,
-        text,
-        show_alert: true,
-      }),
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/answerCallbackQuery`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callback_query_id: callbackQueryId,
+          text,
+          show_alert: true,
+        }),
+      }
+    );
+    if (!response.ok) {
+      console.error("answerCallbackQuery error:", response.status, await response.text());
     }
-  );
+  } catch (err) {
+    console.error("answerCallbackQuery failed:", err);
+  }
 }
 
 // Helper: Edit original message (removes inline keyboard)
@@ -215,17 +267,24 @@ async function editMessage(
   messageId: number,
   text: string
 ) {
-  await fetch(
-    `https://api.telegram.org/bot${botToken}/editMessageText`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        text,
-        parse_mode: "Markdown",
-      }),
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/editMessageText`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: "Markdown",
+        }),
+      }
+    );
+    if (!response.ok) {
+      console.error("editMessageText error:", response.status, await response.text());
     }
-  );
+  } catch (err) {
+    console.error("editMessageText failed:", err);
+  }
 }

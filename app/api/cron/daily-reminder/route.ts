@@ -66,11 +66,15 @@ export async function GET(request: Request) {
         guest_name,
         arrival_time,
         booking_date,
+        booking_mode,
+        start_date,
+        end_date,
         shift_selected,
         total_price,
         pool_id
       `)
-      .eq("booking_date", tomorrowStr)
+      .lte("start_date", tomorrowStr)
+      .gte("end_date", tomorrowStr)
       .eq("status", "confirmed");
 
     if (error) {
@@ -113,11 +117,21 @@ export async function GET(request: Request) {
         ? `\n⏰ Turno: *${booking.shift_selected}*`
         : "";
 
+      const isRange = booking.start_date !== booking.end_date;
+      const isFirstDay = booking.start_date === tomorrowStr;
+      const rangeLabel = isRange
+        ? `\n📅 Período: *${booking.start_date} → ${booking.end_date}*`
+        : "";
+
+      const headerText = isRange && !isFirstDay
+        ? `⏰ *Lembrete: Aluguel em andamento amanhã!*`
+        : `⏰ *Lembrete: Aluguel amanhã!*`;
+
       const message =
-        `⏰ *Lembrete: Aluguel amanhã!*\n\n` +
+        `${headerText}\n\n` +
         `📍 Piscina: *${pool.title}*\n` +
         `👤 Hóspede: *${booking.guest_name}*\n` +
-        `🕐 Chegada: *${booking.arrival_time}*${shiftText}\n` +
+        `🕐 Chegada: *${booking.arrival_time}*${shiftText}${rangeLabel}\n` +
         `💰 Valor: *R$ ${booking.total_price}*\n\n` +
         `📋 Certifique-se de que a piscina está limpa e pronta.`;
 

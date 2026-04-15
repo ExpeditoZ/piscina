@@ -427,34 +427,41 @@ export async function POST(request: Request) {
           `\n💰 Valor: *R$ ${totalPrice}*\n\n` +
           `O hóspede foi redirecionado para o WhatsApp. Já recebeu o PIX?`;
 
-        const callbackBase =
-          bookingMode === "range"
-            ? `${poolId}_${startDateStr}_${endDateStr}`
-            : `${poolId}_${startDateStr}`;
+        // Use booking ID for callback_data (max 44 bytes, well under 64-byte Telegram limit)
+        const bookingId = insertedBooking.id;
 
-        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: pool.telegram_chat_id,
-            text: message,
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "✅ Confirmar & Bloquear",
-                    callback_data: `confirm_${callbackBase}`,
-                  },
-                  {
-                    text: "❌ Rejeitar / Liberar",
-                    callback_data: `reject_${callbackBase}`,
-                  },
+        try {
+          const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: pool.telegram_chat_id,
+              text: message,
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "✅ Confirmar & Bloquear",
+                      callback_data: `confirm_${bookingId}`,
+                    },
+                    {
+                      text: "❌ Rejeitar / Liberar",
+                      callback_data: `reject_${bookingId}`,
+                    },
+                  ],
                 ],
-              ],
-            },
-          }),
-        }).catch(console.error);
+              },
+            }),
+          });
+
+          if (!tgResponse.ok) {
+            const tgError = await tgResponse.text();
+            console.error("Telegram API error:", tgResponse.status, tgError);
+          }
+        } catch (tgErr) {
+          console.error("Telegram send failed:", tgErr);
+        }
       }
     }
 
